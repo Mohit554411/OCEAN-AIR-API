@@ -1,0 +1,5786 @@
+openapi: 3.1.0
+info:
+  title: Visibility API specification
+  description: The Transporeon **Visibility API** enables you to interact with transports, vehicles and companies to provide, receive and enable real-time tracking of transports you are involved in. A textual written usage guide to complement the technical specifications can be found [here](https://support.transporeon.com/hcskb/display/ADPD/Visibility+Hub).
+  version: 0.3.3
+  license:
+    name: unlicensed
+    url: https://support.transporeon.com
+  contact:
+    name: API Support
+    url: https://support.transporeon.com
+servers:
+  - url: https://api.transporeon.com/rtv/v1
+    description: Production server
+  - url: https://api.test.transporeon.com/rtv/v1
+    description: Acceptance server
+security:
+  - BasicAuth: []
+tags:
+  - name: Create, update or delete transport relevant for visibility
+    description: Collection of supporting endpoints to create, update and delete transports.
+  - name: Allocate a vehicle to a transport
+    description: Collection of supporting endpoints for allocating a vehicle to a transport.
+  - name: Receive visibility data into your in-house system
+    description: Collection of supporting endpoints providing transport visibility information.
+  - name: Send visibility data from your in-house system
+    description: Collection of supporting endpoints allowing to send transport visibility information.
+  - name: Listing transports relevant for visibility
+    description: Collection of supporting endpoints allowing to query transport related info.
+  - name: Listing vehicles available for allocation
+    description: Collection of supporting endpoints allowing to view vehicles.
+  - name: Listing customers and subcontractors
+    description: Collection of supporting endpoints allowing to view partners.
+  - name: Managing telematics-integration vehicles
+    description: Collection of supporting endpoints allowing to manage vehicles.
+paths:
+  /transports:
+    get:
+      tags:
+        - Listing transports relevant for visibility
+      summary: Get transports sorted by start time
+      operationId: transports@get
+      parameters:
+        - name: vehicle_allocation_status
+          in: query
+          description: Vehicle allocation status of the requested transports
+          schema:
+            enum:
+              - unallocated
+              - allocated
+        - name: is_finished
+          in: query
+          description: _false_ if the result should only contain shipments that are not finished yet, _true_ if the result should only contain shipments that are finished, not set if the result should contain all shipments
+          schema:
+            type: boolean
+            example: true
+        - name: transport_number
+          in: query
+          description: Shipper transport number of the transport. Only case-sensitive exact matches, meaning "TST1" matches "TST1", but not "TST123" or "ATST1" or "tst1". If this is used then transport_id or transport_filter parameters cannot be used!
+          schema:
+            type: string
+            example: TST12345678
+        - name: transport_id
+          in: query
+          description: Transporeon assigned transport number. If this is used then transport_number or transport_filter parameters cannot be used!
+          schema:
+            type: string
+          example: '1234567'
+        - name: start_time_before
+          in: query
+          description: Datetime before transport started
+          schema:
+            type: string
+            format: date-time
+        - name: start_time_after
+          in: query
+          description: Datetime after transport started
+          schema:
+            type: string
+            format: date-time
+        - name: end_time_before
+          in: query
+          description: Datetime before transport ended
+          schema:
+            type: string
+            format: date-time
+        - name: end_time_after
+          in: query
+          description: Datetime after transport ended
+          schema:
+            type: string
+            format: date-time
+        - name: company_id
+          in: query
+          description: The ID of the company you'd like to filter the transports by. Exposed in the visibility_stakeholders object.
+          schema:
+            type: string
+          example: '2345'
+        - name: transport_filter
+          in: query
+          description: Transports with matching transport_number or transport_id or delivery_number or purchase_order_number or order_number will be returned. If this is used then transport_number or transport_id parameters cannot be used! The parameter can also be a partial match to the searched transport.
+          schema:
+            type: string
+          example: '234512'
+        - name: custom_fields
+          in: query
+          description: |
+            Filter by custom fields using the format: custom_fields=key1:value1,key2:value2. Ensure that both the keys and values are valid, case-sensitive and properly URL-encoded (for example, the colon (:) should be encoded as %3A).
+          schema:
+            type: string
+          example: key:value
+        - $ref: '#/components/parameters/cursorParam'
+      responses:
+        '200':
+          description: Paginated list of transports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transports:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transport'
+                  page_info:
+                    type: object
+                    allOf:
+                      - $ref: '#/components/schemas/PageInfo'
+                required:
+                  - transports
+                  - page_info
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /transports/{identifier_type}/{identifier_value}:
+    get:
+      tags:
+        - Listing transports relevant for visibility
+      summary: Get transport details
+      operationId: transports@getIdenftifier
+      parameters:
+        - name: identifier_type
+          in: path
+          description: id type
+          schema:
+            type: string
+            enum:
+              - transport_id
+              - transport_number
+          required: true
+        - name: identifier_value
+          in: path
+          description: Transport Number or ID
+          required: true
+          schema:
+            type: string
+            example: '1243214'
+      responses:
+        '200':
+          description: Transport object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transport'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+    put:
+      tags:
+        - Create, update or delete transport relevant for visibility
+      security:
+        - BearerAuth: []
+      summary: Create or update transport
+      operationId: transports@createOrUpdateIdentifier
+      parameters:
+        - name: identifier_type
+          in: path
+          description: id type
+          schema:
+            type: string
+            enum:
+              - transport_id
+              - transport_number
+          required: true
+        - name: identifier_value
+          in: path
+          description: Transport Number or ID
+          required: true
+          schema:
+            type: string
+            example: '1243214'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/CreateRoadTransport'
+                - $ref: '#/components/schemas/CreateOceanTransport'     
+                - $ref: '#/components/schemas/CreateAirTransport'                
+                
+      responses:
+        '200':
+          description: Transport object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransportCreateUpdateResponse'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+    delete:
+      tags:
+        - Create, update or delete transport relevant for visibility
+      security:
+        - BearerAuth: []
+      summary: Delete existing transport
+      operationId: transports@deleteIdentifier
+      description: DELETE operation is asynchronous and it might take a few moments for shipment to actually being deleted
+      parameters:
+        - name: identifier_type
+          in: path
+          description: id type
+          schema:
+            type: string
+            enum:
+              - transport_id
+              - transport_number
+          required: true
+        - name: identifier_value
+          in: path
+          description: Transport Number or ID
+          required: true
+          schema:
+            type: string
+            example: '1243214'
+      responses:
+        '204':
+          $ref: '#/components/responses/204_NoContent'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /transports/{identifier_type}/{identifier_value}/status:
+    get:
+      tags:
+        - Receive visibility data into your in-house system
+      summary: Get status information of a specific transport.
+      operationId: transports@getIdentifierStatus
+      parameters:
+        - name: identifier_type
+          in: path
+          description: id type
+          schema:
+            type: string
+            enum:
+              - transport_id
+              - transport_number
+          required: true
+        - name: identifier_value
+          in: path
+          description: Transport Number or ID
+          required: true
+          schema:
+            type: string
+            example: '1243214'
+      responses:
+        '200':
+          description: Transport status related information about specific transport
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransportStatus'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /transports/status:
+    get:
+      tags:
+        - Receive visibility data into your in-house system
+      summary: Get status information for matching transports by search parameters
+      operationId: transports@getStatus
+      parameters:
+        - name: transport_number
+          in: query
+          description: Shipper transport number of the transport. Only case-sensitive exact matches, meaning "TST1" matches "TST1", but not "TST123" or "ATST1" or "tst1". If this is used then transport_id or transport_filter parameters cannot be used!
+          required: false
+          schema:
+            type: string
+            example: '314159'
+        - name: transport_id
+          in: query
+          description: Transporeon assigned transport number. If this is used then transport_number or transport_filter parameters cannot be used!
+          required: false
+          schema:
+            type: string
+            example: '314159'
+        - name: transport_filter
+          in: query
+          description: transports with matching transport_number or transport_id or delivery_number or purchase_order_number or order_number will be returned. If this is used then transport_number or transport_id parameters cannot be used!
+          required: false
+          schema:
+            type: string
+            example: '314159'
+        - $ref: '#/components/parameters/cursorParam'
+      responses:
+        '200':
+          description: Paginated list of transports RTV statuses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transports:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TransportStatus'
+                  page_info:
+                    type: object
+                    allOf:
+                      - $ref: '#/components/schemas/PageInfo'
+                required:
+                  - transports
+                  - page_info
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+    post:
+    
+      tags:
+        - Send visibility data from your in-house system
+      summary: Send new transport status.
+      operationId: transports@setStatus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Batch of transport status updates
+              properties:
+                transport_updates:
+                  type: array
+                  maxItems: 100
+                  items:
+                    $ref: '#/components/schemas/TransportStatusUpdate'
+                integration_identifier:
+                  $ref: '#/components/schemas/IntegrationIdentifiers'
+              required:
+                - transport_updates
+            examples:
+              transport_telemetry_transport_id:
+                summary: Send vehicle GPS telemetry on a transport level (applied to all deliveries) using 'transport_id' as identifier
+                value:
+                  transport_updates:
+                    - transport_id: '983549358'
+                      vehicle_telemetry:
+                        timestamp: '2019-08-24T14:15:22Z'
+                        position:
+                          lat: 59.4365094
+                          lng: 24.7428656
+                        direction: 132
+                        speed: 75
+                        odometer: 523145
+                        is_engine_running: false
+                        front_axle_weight_kg: 0
+                        rear_axle_weight_kg: 0
+                        total_weight_kg: 0
+                        altitude_meters: 143
+                        fuel_level_pct: 20.4
+                        clean_source_pct: 20.4
+                        total_fuel_consumption_liters: 4004.11
+                    - transport_id: '12345678'
+                      vehicle_telemetry:
+                        timestamp: '2019-08-24T15:12:22Z'
+                        position:
+                          lat: 57.4365094
+                          lng: 23.7428656
+                        direction: 132
+                        speed: 75
+                        odometer: 523145
+                        is_engine_running: false
+                        front_axle_weight_kg: 0
+                        rear_axle_weight_kg: 0
+                        total_weight_kg: 0
+                        altitude_meters: 143
+                        fuel_level_pct: 20.4
+                        clean_source_pct: 20.4
+                        total_fuel_consumption_liters: 4004.11
+              transport_telemetry_transport_number:
+                summary: Send vehicle GPS telemetry on a transport level (applied to all deliveries) using 'transport_number' as identifier
+                value:
+                  transport_updates:
+                    - transport_number: '983549358'
+                      vehicle_telemetry:
+                        timestamp: '2019-08-24T14:15:22Z'
+                        position:
+                          lat: 59.4365094
+                          lng: 24.7428656
+                        direction: 132
+                        speed: 75
+                        odometer: 523145
+                        is_engine_running: false
+                        front_axle_weight_kg: 0
+                        rear_axle_weight_kg: 0
+                        total_weight_kg: 0
+                        altitude_meters: 143
+                        fuel_level_pct: 20.4
+                        clean_source_pct: 20.4
+                        total_fuel_consumption_liters: 4004.11
+              delivery_telemetry_delivery_id:
+                summary: Send vehicle GPS telemetry on a delivery level using 'delivery_id' as identifier
+                value:
+                  transport_updates:
+                    - delivery_id: '1324512551'
+                      vehicle_telemetry:
+                        timestamp: '2019-08-24T14:15:22Z'
+                        position:
+                          lat: 59.4365094
+                          lng: 24.7428656
+                        direction: 132
+                        speed: 75
+                        odometer: 523145
+                        is_engine_running: false
+                        front_axle_weight_kg: 0
+                        rear_axle_weight_kg: 0
+                        total_weight_kg: 0
+                        altitude_meters: 143
+                        fuel_level_pct: 20.4
+                        clean_source_pct: 20.4
+                        total_fuel_consumption_liters: 4004.11
+              delivery_telemetry_delivery_number:
+                summary: Send vehicle GPS telemetry on a delivery level using 'delivery_number' as identifier
+                value:
+                  transport_updates:
+                    - delivery_number: '1324512551'
+                      vehicle_telemetry:
+                        timestamp: '2019-08-24T14:15:22Z'
+                        position:
+                          lat: 59.4365094
+                          lng: 24.7428656
+                        direction: 132
+                        speed: 75
+                        odometer: 523145
+                        is_engine_running: false
+                        front_axle_weight_kg: 0
+                        rear_axle_weight_kg: 0
+                        total_weight_kg: 0
+                        altitude_meters: 143
+                        fuel_level_pct: 20.4
+                        clean_source_pct: 20.4
+                        total_fuel_consumption_liters: 4004.11
+              delivery_loading_status:
+                summary: Send loading status for multiple different deliveries
+                value:
+                  transport_updates:
+                    - delivery_id: '123456'
+                      loading_status:
+                        timestamp: '2019-08-24T15:00:00.00Z'
+                        eta: '2019-08-24T14:15:22Z'
+                        estimated_remaining_distance_meters: 5000.151
+                        events:
+                          - event_id: 6f6f6f
+                            timestamp: '2019-08-24T15:00:00.00Z'
+                            qualifier: started
+                            position:
+                              lat: 59.4365094
+                              lng: 24.7428656
+                    - delivery_id: '123457'
+                      loading_status:
+                        timestamp: '2019-08-24T15:00:00.00Z'
+                        eta: '2019-08-24T14:15:22Z'
+                        estimated_remaining_distance_meters: 5000.151
+                        events:
+                          - event_id: 1a2b3c
+                            timestamp: '2019-08-24T15:00:00.00Z'
+                            qualifier: started
+                            position:
+                              lat: 59.4365094
+                              lng: 24.7428656
+              transport_temperature_transport_id:
+                summary: Send vehicle temperature data on a transport level (applied to all deliveries) using 'transport_id' as identifier
+                value:
+                  transport_updates:
+                    - transport_id: '983549358'
+                      temperatures:
+                        - timestamp: '2019-08-24T14:15:22Z'
+                          reefer_id: 1a
+                          sensor_readings:
+                            - compartment_id: c1
+                              sensor_id: s1
+                              temperature: 5.5
+                            - compartment_id: c2
+                              sensor_id: s1
+                              temperature: 4.5
+                        - timestamp: '2019-08-24T14:15:22Z'
+                          reefer_id: 2a
+                          sensor_readings:
+                            - compartment_id: c1
+                              sensor_id: s1
+                              temperature: 10.5
+                              is_compartment_door_open: true
+              transport_loading_status:
+                summary: Send loading status for a transport (applied to all deliveries)
+                value:
+                  transport_updates:
+                    - transport_number: '1234567'
+                      loading_status:
+                        timestamp: '2019-08-24T14:15:22Z'
+                        eta: '2019-08-24T15:15:22Z'
+                        events:
+                          - event_id: 1a2b3c
+                            timestamp: '2019-08-23T15:15:22Z'
+                            qualifier: heading_towards
+                            position:
+                              lat: 59.4365094
+                              lng: 24.7428656
+                      vehicle_data:
+                        license_plate_number: ABC 123
+              transport_transport_event_transport_number:
+                summary: Send transport event using 'transport_number' as identifier
+                value:
+                  transport_updates:
+                    - transport_number: '983549358'
+                      transport_events:
+                        - event_id: 123acd
+                          timestamp: '2019-08-24T15:00:00.00Z'
+                          qualifier: tracking_started
+                          location_data:
+                            name: Parking space 5
+                            locode: DE
+                          position:
+                            lat: 51.23685
+                            lng: 11.8132
+                        - event_id: 456acd
+                          timestamp: '2019-08-24T13:00:00.00Z'
+                          qualifier: completed
+                          location_data:
+                            name: Storage 3
+                            locode: DE
+                          position:
+                            lat: 51.13685
+                            lng: 11.7032
+              deleting_existing_event:
+                summary: Delete previously sent event by providing deleted_at timestamp
+                value:
+                  transport_updates:
+                    - transport_number: '1234567'
+                      loading_status:
+                        events:
+                          - event_id: 1a2b3c
+                            timestamp: '2019-08-23T15:15:22Z'
+                            deleted_at: '2019-08-23T18:15:22Z'
+              event_qualifier_custom:
+                summary: Send an event with a custom qualifier
+                value:
+                  transport_updates:
+                    - transport_number: '1234567'
+                      unloading_status:
+                        timestamp: '2019-08-24T14:15:22Z'
+                        eta: '2019-08-24T15:15:22Z'
+                        events:
+                          - event_id: 1a2b3c
+                            timestamp: '2019-08-23T15:15:22Z'
+                            qualifier_custom: Waiting for unloading / Idle
+                            position:
+                              lat: 59.4365094
+                              lng: 24.7428656
+      responses:
+        '200':
+          $ref: '#/components/responses/200_Ok'
+        '202':
+          $ref: '#/components/responses/202_Accepted'
+        '204':
+          $ref: '#/components/responses/204_NoContent'
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '413':
+          $ref: '#/components/responses/413_PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /transports/ocean-status:
+    post:
+      tags:
+        - Send visibility data from your in-house system
+      summary: Send Ocean Transport Status.
+      operationId: transports@setOceanStatus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Batch of transport status updates
+              properties:
+                transport_updates:
+                  type: array
+                  maxItems: 100
+                  items:
+                    $ref: '#/components/schemas/OceanTransportStatusUpdate'
+
+              required:
+                - transport_updates
+      responses:
+        '200':
+          $ref: '#/components/responses/200_Ok'
+        '202':
+          $ref: '#/components/responses/202_Accepted'
+        '204':
+          $ref: '#/components/responses/204_NoContent'
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '413':
+          $ref: '#/components/responses/413_PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+
+  /transports/air-status:
+    post:
+      tags:
+        - Send visibility data from your in-house system
+      summary: Send Air Transport Status.
+      operationId: transports@setAirStatus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Batch of transport status updates
+              properties:
+                transport_updates:
+                  type: array
+                  maxItems: 100
+                  items:
+                    $ref: '#/components/schemas/AirTransportStatusUpdate'
+
+              required:
+                - transport_updates
+      responses:
+        '200':
+          $ref: '#/components/responses/200_Ok'
+        '202':
+          $ref: '#/components/responses/202_Accepted'
+        '204':
+          $ref: '#/components/responses/204_NoContent'
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '413':
+          $ref: '#/components/responses/413_PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+
+
+  /transports/emissions:
+    get:
+      tags:
+        - Transport emissions
+      summary: Get emissions for transports sorted by the time of latest transport emissions calculation
+      operationId: emissions@get
+      parameters:
+        - name: transport_number
+          in: query
+          description: Shipper transport number of the transport. Only case-sensitive exact matches, meaning "TST1" matches "TST1", but not "TST123" or "ATST1" or "tst1". If this is used then transport_id or transport_filter parameters cannot be used!
+          schema:
+            type: string
+            example: TST12345678
+        - name: transport_id
+          in: query
+          description: Transporeon assigned transport number. If this is used then transport_number or transport_filter parameters cannot be used!
+          schema:
+            type: string
+          example: '1234567'
+        - name: start_time_before
+          in: query
+          description: Datetime before transport started
+          schema:
+            type: string
+            format: date-time
+        - name: start_time_after
+          in: query
+          description: Datetime after transport started
+          schema:
+            type: string
+            format: date-time
+        - name: emissions_latest_calculated_before
+          in: query
+          description: Datetime before latest transport emissions calculation
+          schema:
+            type: string
+            format: date-time
+        - name: emissions_latest_calculated_after
+          in: query
+          description: Datetime after latest transport emissions calculation
+          schema:
+            type: string
+            format: date-time
+        - name: emissions_first_calculated_before
+          in: query
+          description: Datetime before first emissions calculation for the transport
+          schema:
+            type: string
+            format: date-time
+        - name: emissions_first_calculated_after
+          in: query
+          description: Datetime after first emissions calculation for the transport
+          schema:
+            type: string
+            format: date-time
+        - name: company_id
+          in: query
+          description: The ID of the company you'd like to filter the transports by. Exposed in the visibility_stakeholders object.
+          schema:
+            type: string
+          example: '2345'
+        - name: transport_filter
+          in: query
+          description: Transports with matching transport_number or transport_id or delivery_number or purchase_order_number or order_number will be returned. If this is used then transport_number or transport_id parameters cannot be used! The parameter can also be a partial match to the searched transport.
+          schema:
+            type: string
+          example: '234512'
+        - $ref: '#/components/parameters/cursorParam'
+      responses:
+        '200':
+          description: Paginated list of transport emissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transports:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/TransportEmissions'
+                        - type: object
+                          properties:
+                            visibility_stakeholders:
+                              type: array
+                              description: |
+                                An array of the companies holding a stake in the visibility of this transport. The array is ordered from owner of the transport to the executing carrier. Note that depending on the requester position, not every stakeholder might be visible.
+                              items:
+                                $ref: '#/components/schemas/CompanyProfile'
+                            start_time:
+                              type: string
+                              format: date-time
+                              description: |
+                                Expected start time of the transport in ISO8601 format.
+                  page_info:
+                    $ref: '#/components/schemas/PageInfo'
+                required:
+                  - transports
+                  - page_info
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /transports/{identifier_type}/{identifier_value}/emissions:
+    get:
+      tags:
+        - Transport emissions
+      summary: Get emissions for a specific transport
+      operationId: emissions@getIdenftifier
+      parameters:
+        - name: identifier_type
+          in: path
+          description: ID type
+          schema:
+            type: string
+            enum:
+              - transport_id
+              - transport_number
+          required: true
+        - name: identifier_value
+          in: path
+          description: Transport Number or ID
+          required: true
+          schema:
+            type: string
+            example: '1243214'
+      responses:
+        '200':
+          description: Transport emissions object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransportEmissions'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /transports/{identifier_type}/{identifier_value}/status-v2:
+    get:
+      tags:
+        - Receive visibility data into your in-house system
+      summary: Get status v2 information of a specific transport.
+      operationId: transports@getIdentifierStatusV2
+      parameters:
+        - name: identifier_type
+          in: path
+          description: id type
+          schema:
+            type: string
+            enum:
+              - transport_id
+              - transport_number
+          required: true
+        - name: identifier_value
+          in: path
+          description: Transport Number or ID
+          required: true
+          schema:
+            type: string
+            example: '1243214'
+      responses:
+        '200':
+          description: Transport status related information about specific transport
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/TransportStatusV2'
+                  - $ref: '#/components/schemas/OceanTransportStatus'
+                  - $ref: '#/components/schemas/AirTransportStatus'
+                  
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /transports/status-v2:
+    get:
+      tags:
+        - Receive visibility data into your in-house system
+      summary: Get status V2 information for matching transports by search parameters
+      operationId: transports@getStatusV2
+      parameters:
+        - name: transport_number
+          in: query
+          description: Shipper transport number of the transport. Only case-sensitive exact matches, meaning "TST1" matches "TST1", but not "TST123" or "ATST1" or "tst1". If this is used then transport_id or transport_filter parameters cannot be used!
+          required: false
+          schema:
+            type: string
+            example: '314159'
+        - name: transport_id
+          in: query
+          description: Transporeon assigned transport number. If this is used then transport_number or transport_filter parameters cannot be used!
+          required: false
+          schema:
+            type: string
+            example: '314159'
+        - name: transport_filter
+          in: query
+          description: transports with matching transport_number or transport_id or delivery_number or purchase_order_number or order_number will be returned. If this is used then transport_number or transport_id parameters cannot be used!
+          required: false
+          schema:
+            type: string
+            example: '314159'
+        - $ref: '#/components/parameters/cursorParam'
+      responses:
+        '200':
+          description: Paginated list of transports RTV statuses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transports:
+                    type: array
+                    items:
+                      anyOf:
+                        - $ref: '#/components/schemas/TransportStatusV2'
+                        - $ref: '#/components/schemas/OceanTransportStatus'
+                        - $ref: '#/components/schemas/AirTransportStatus'                     
+                  page_info:
+                    type: object
+                    allOf:
+                      - $ref: '#/components/schemas/PageInfo'
+                required:
+                  - transports
+                  - page_info
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /transports/{identifier_type}/{identifier_value}/allocation:
+    post:
+      tags:
+        - Allocate a vehicle to a transport
+      summary: Allocate a vehicle to a transport
+      operationId: transports@createAllocation
+      description: Allocate a vehicle to a transport
+      parameters:
+        - name: identifier_type
+          in: path
+          description: id type
+          schema:
+            type: string
+            enum:
+              - transport_id
+              - transport_number
+          required: true
+        - name: identifier_value
+          in: path
+          description: Transport Number or ID
+          required: true
+          schema:
+            type: string
+            example: '1243214'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleAllocationCreateContents'
+      responses:
+        '200':
+          description: The request succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Free form, human readable message text
+                    example: 'Global allocation ... '
+        '202':
+          $ref: '#/components/responses/202_Accepted'
+        '204':
+          $ref: '#/components/responses/204_NoContent'
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+    get:
+      tags:
+        - Allocate a vehicle to a transport
+      summary: Get vehicle allocated to the transport
+      operationId: transports@getIdentifierAllocation
+      description: |
+        Get vehicle allocated to the transport
+      parameters:
+        - name: identifier_type
+          in: path
+          description: id type
+          schema:
+            type: string
+            enum:
+              - transport_id
+              - transport_number
+          required: true
+        - name: identifier_value
+          in: path
+          description: Transport Number or ID
+          required: true
+          schema:
+            type: string
+            example: '1243214'
+      responses:
+        '200':
+          description: Allocation object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transport_allocation:
+                    $ref: '#/components/schemas/Allocation'
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+    delete:
+      tags:
+        - Allocate a vehicle to a transport
+      summary: Clear allocations
+      operationId: transports@clearAllocations
+      description: Clear all allocations. If the specified transport does not have a vehicle allocation then 400 error is returned.
+      parameters:
+        - name: identifier_type
+          in: path
+          description: id type
+          schema:
+            type: string
+            enum:
+              - transport_id
+              - transport_number
+          required: true
+        - name: identifier_value
+          in: path
+          description: Transport Number or ID
+          required: true
+          schema:
+            type: string
+            example: '1243214'
+      responses:
+        '200':
+          $ref: '#/components/responses/200_Ok'
+        '202':
+          $ref: '#/components/responses/202_Accepted'
+        '204':
+          $ref: '#/components/responses/204_NoContent'
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /transports/{identifier_type}/{identifier_value}/deallocation:
+    post:
+      tags:
+        - Allocate a vehicle to a transport
+      summary: Deallocate a vehicle from a transport
+      operationId: transports@removeIdentifierAllocation
+      description: Deallocate a vehicle from a transport. If the specified transport does not have a vehicle allocation then 400 error is returned.
+      parameters:
+        - name: identifier_type
+          in: path
+          description: id type
+          schema:
+            type: string
+            enum:
+              - transport_id
+              - transport_number
+          required: true
+        - name: identifier_value
+          in: path
+          description: Transport Number or ID
+          required: true
+          schema:
+            type: string
+            example: '1243214'
+      responses:
+        '200':
+          $ref: '#/components/responses/200_Ok'
+        '202':
+          $ref: '#/components/responses/202_Accepted'
+        '204':
+          $ref: '#/components/responses/204_NoContent'
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /telematics-integrations:
+    get:
+      tags:
+        - Managing telematics-integration vehicles
+      summary: Get telematics integrations
+      operationId: telematics@getIntegrations
+      parameters:
+        - $ref: '#/components/parameters/cursorParam'
+      responses:
+        '200':
+          description: Paginated list of integrations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  integrations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Integration'
+                  page_info:
+                    type: object
+                    allOf:
+                      - $ref: '#/components/schemas/PageInfo'
+                required:
+                  - integrations
+                  - page_info
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /telematics-integrations/{integration_id}/vehicles:
+    get:
+      tags:
+        - Managing telematics-integration vehicles
+      summary: Get telematics integration vehicles
+      operationId: telematics@getIntegrationVehicles
+      description: Get telematics integration vehicles list
+      parameters:
+        - $ref: '#/components/parameters/integrationIdPathParam'
+        - $ref: '#/components/parameters/cursorParam'
+      responses:
+        '200':
+          description: Paginated list of vehicles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vehicles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/IntegrationVehicle'
+                  page_info:
+                    type: object
+                    allOf:
+                      - $ref: '#/components/schemas/PageInfo'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+    post:
+      tags:
+        - Managing telematics-integration vehicles
+      summary: Connect vehicles to a telematics integration
+      operationId: telematics@createIntegratiodVehicles
+      description: Create connection for vehicle to an FMS which does not provide their own vehicle data. This feature should only be used in combination with an integration which supports such vehicle creation. Do not use unless there's a need and integration setup document has suggested so!
+      parameters:
+        - $ref: '#/components/parameters/integrationIdPathParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                integration_vehicle_id:
+                  type: string
+                  description: |
+                    The unique id of the vehicle on the FMS side for which the connection is formed. Note that this is case and whitespace sensitive.
+                  example: abc
+                license_plate:
+                  type: string
+                  description: License plate number
+                  example: 123ABC
+              required:
+                - integration_vehicle_id
+                - license_plate
+      responses:
+        '202':
+          description: Integration vehicle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationVehicle'
+        '400':
+          description: 'Bad request: already existing vehicles provided: CHEF1 (1733:1) CHEF2 (1733:2)'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /telematics-integrations/{integration_id}/vehicles/{license_plate_number}:
+    delete:
+      tags:
+        - Managing telematics-integration vehicles
+      summary: Disconnect vehicles from a telematics integration
+      operationId: telematics@removeIntegrationVehicle
+      description: Remove vehicle connection to an FMS which does not provide their own vehicle data. This feature should only be used in combination with an integration which supports such vehicle creation. If last connection is deleted then vehicle itself also will be deleted. Do not use unless there's a need and integration setup document has suggested so!
+      parameters:
+        - $ref: '#/components/parameters/integrationIdPathParam'
+        - $ref: '#/components/parameters/licencePlatePathParam'
+      responses:
+        '202':
+          description: Connection (and vehicle) is removed
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /vehicles/{license_plate_number}:
+    get:
+      tags:
+        - Listing vehicles available for allocation
+      summary: Search vehicles accessible for this company (owned or granted vehicles).
+      operationId: vehicles@getVehicle
+      description: Allows to search a vehicle by specifying a license plate number. The license plate lookup is done in a  normalized way, with punctuation and whitespace characters removed. The license plate number parameter  must contain 3 or more alphanumeric characters.
+      parameters:
+        - name: license_plate_number
+          in: path
+          description: The license plate of the vehicle being searched for
+          required: true
+          schema:
+            type: string
+            example: 123ABC
+        - $ref: '#/components/parameters/cursorParam'
+      responses:
+        '200':
+          description: Paginated list of vehicles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vehicles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vehicle'
+                  page_info:
+                    type: object
+                    allOf:
+                      - $ref: '#/components/schemas/PageInfo'
+                required:
+                  - vehicles
+                  - page_info
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /vehicles:
+    get:
+      tags:
+        - Listing vehicles available for allocation
+      summary: Get vehicles accessible for this company (owned or granted vehicles).
+      operationId: vehicles@get
+      description: list all vehicles
+      parameters:
+        - $ref: '#/components/parameters/cursorParam'
+      responses:
+        '200':
+          description: Paginated list of vehicles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vehicles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vehicle'
+                  page_info:
+                    type: object
+                    allOf:
+                      - $ref: '#/components/schemas/PageInfo'
+                required:
+                  - vehicles
+                  - page_info
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /partners:
+    get:
+      tags:
+        - Listing customers and subcontractors
+      summary: Get the list of partners
+      operationId: partners@get
+      parameters:
+        - name: company_id
+          in: query
+          description: Transporeon ID of the company
+          schema:
+            type: string
+            example: '133321'
+        - name: vat
+          in: query
+          description: Company VAT number
+          schema:
+            type: string
+            example: DE1234567890
+        - name: company_name
+          in: query
+          description: 'Partners company name. Uses search by normalized name and enables partial matching. This means that all the non-alphanumeric characters are stripped and all letters converted to lowercase during comparison. Example: search by company name "Henry''s company" would match vehicles with companies "Henrys company", "Henry''s company (Europe)", "New Henry''s company" and etc.'
+          schema:
+            type: string
+            example: A Corp.
+        - $ref: '#/components/parameters/cursorParam'
+      responses:
+        '200':
+          description: Paginated list of partners
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  partners:
+                    type: array
+                    maxItems: 100
+                    items:
+                      $ref: '#/components/schemas/Partner'
+                  page_info:
+                    type: object
+                    allOf:
+                      - $ref: '#/components/schemas/PageInfo'
+                required:
+                  - partners
+                  - page_info
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /places:
+    get:
+      tags:
+        - Managing custom Places
+      summary: Get places sorted by place reference ID
+      operationId: places@get
+      parameters:
+        - $ref: '#/components/parameters/cursorParam'
+      responses:
+        '200':
+          description: Paginated list of places
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  places:
+                    type: array
+                    items:
+                      allOf:
+                        - type: object
+                          properties:
+                            place_reference_id:
+                              type: string
+                              description: Unique reference ID of the place
+                              example: factory_01
+                        - $ref: '#/components/schemas/Place'
+                  page_info:
+                    type: object
+                    allOf:
+                      - $ref: '#/components/schemas/PageInfo'
+                required:
+                  - places
+                  - page_info
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+  /places/{place_reference_id}:
+    get:
+      tags:
+        - Managing custom Places
+      summary: Get place by place reference ID
+      operationId: places@getPlace
+      parameters:
+        - name: place_reference_id
+          in: path
+          description: Place reference ID
+          required: true
+          schema:
+            type: string
+            example: factory_01
+      responses:
+        '200':
+          description: Requested place details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    properties:
+                      place_reference_id:
+                        type: string
+                        description: Unique reference ID of the place
+                        example: factory_01
+                  - $ref: '#/components/schemas/Place'
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '404':
+          $ref: '#/components/responses/404_NotFound'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+    put:
+      tags:
+        - Managing custom Places
+      summary: Create new place
+      operationId: places@putPlace
+      parameters:
+        - name: place_reference_id
+          in: path
+          description: Place reference ID
+          required: true
+          schema:
+            type: string
+            example: factory_01
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Place'
+            examples:
+              place_with_circular_geofence:
+                summary: Create a place with a circular geofence
+                value:
+                  name: Factory 01
+                  geometry:
+                    type: Point
+                    coordinates:
+                      - 48.8565
+                      - 2.3521
+                  address:
+                    street_address: 1 Factory Street
+                    city: Paris
+                    zipcode: '75001'
+                    country: FR
+                    name: Factory S.A.
+                    disable_address_matching: false
+                  geofence:
+                    type: Feature
+                    properties:
+                      radius_in_meters: 200
+                    geometry:
+                      type: Point
+                      coordinates:
+                        - 48.8566
+                        - 2.3522
+              place_with_polygon_geofence:
+                summary: Create a place with a polygonal geofence
+                value:
+                  name: Factory 02
+                  geometry:
+                    type: Point
+                    coordinates:
+                      - 48.8565
+                      - 2.3521
+                  address:
+                    street_address: 2 Factory Street
+                    city: Paris
+                    zipcode: '75001'
+                    country: FR
+                    name: Factory 2 S.A.
+                    disable_address_matching: false
+                  geofence:
+                    type: Feature
+                    geometry:
+                      type: Polygon
+                      coordinates:
+                        - - 48.8566
+                          - 2.3522
+                        - - 48.855799
+                          - 2.3522
+                        - - 48.856038
+                          - 2.354739
+                        - - 48.8566
+                          - 2.3522
+                  address_aliases:
+                    - name: Factory 2
+                      street_address: 2 Factory Str
+                      city: Paris
+                      zipcode: '75001'
+                      country: FR
+      responses:
+        '200':
+          $ref: '#/components/responses/200_Ok'
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '409':
+          $ref: '#/components/responses/409_Conflict'
+        '429':
+          $ref: '#/components/responses/429_TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+    delete:
+      tags:
+        - Managing custom Places
+      summary: Delete place by place reference ID
+      operationId: places@deletePlace
+      parameters:
+        - name: place_reference_id
+          in: path
+          description: Place reference ID
+          required: true
+          schema:
+            type: string
+            example: factory_01
+      responses:
+        '200':
+          $ref: '#/components/responses/200_Ok'
+        '202':
+          $ref: '#/components/responses/202_Accepted'
+        '204':
+          $ref: '#/components/responses/204_NoContent'
+        '400':
+          $ref: '#/components/responses/400_BadRequest'
+        '401':
+          $ref: '#/components/responses/401_Unauthorized'
+        '403':
+          $ref: '#/components/responses/403_Forbidden'
+        '500':
+          $ref: '#/components/responses/500_ServerError'
+webhooks:
+  transport-status:
+    post:
+      summary: Receive visibility data into your in-house system
+      operationId: transport-status
+      tags:
+        - Receive visibility data into your in-house system
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        description: |
+          Webhook version of the transport-status API response. The payload is the same as the response of the
+          transport-status API, with the difference that webhook is wrapped in an event container with some extra
+          metadata.
+
+          Webhook activation is currently not a self-service, but must be done by one of the Transporeon employees.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookPayload'
+      responses:
+        '200':
+          description: Return a 200 status to indicate that the data was received successfully
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+    BearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    cursorParam:
+      name: cursor
+      in: query
+      description: Cursor to get the next page
+      schema:
+        type: string
+        example: c2l4Zm9sZF9hcGlfZXhhbXBsZQ==
+    integrationIdPathParam:
+      name: integration_id
+      in: path
+      description: ID of the telematics integration
+      required: true
+      schema:
+        type: string
+        example: '3541'
+    licencePlatePathParam:
+      name: license_plate_number
+      in: path
+      description: The license plate of the vehicle being searched for
+      required: true
+      schema:
+        type: string
+        example: 123ABC
+  schemas:
+    Allocation:
+      type: object
+      description: Content of allocation
+      properties:
+        tracker_id:
+          type: string
+          description: Tracker id of the vehicle. Only used in rare cases if actual license plate is not known.
+        license_plate_number:
+          type: string
+          description: License plate number of the allocated vehicle.
+          example: 123 ABC
+        created_at:
+          type: string
+          format: date-time
+          description: Time when the allocation was created.
+    ApplicationDeepLink:
+      type: object
+      description: Links to external systems
+      properties:
+        application_name:
+          type: string
+          enum:
+            - TA
+            - TOPS
+            - TSM
+          description: Name of the external system
+          example: TA
+        permitted_companies:
+          type: array
+          description: List of permitted company IDs that have access to the given url.  In case this field is missing or is an empty array, all companies in the transport chain have access.
+          items:
+            type: string
+          example:
+            - '123'
+            - '456'
+        url:
+          type: string
+          description: URL to the external system
+          example: https://example.com/123
+      required:
+        - application_name
+        - url
+    CustomFields:
+      type: object
+      additionalProperties:
+        type: object
+        properties:
+          value:
+            type: string
+            deprecated: true
+            example: '123'
+          values:
+            type: array
+            items:
+              type: string
+              example: '123'
+          visibility:
+            type: string
+            enum:
+              - creator
+              - forwarding_chain
+              - everyone
+            default: creator
+            description: Controls which parties can see the custom field value 'creator' (default) - only the company that creates the transport can see the custom field 'forwarding_chain' - all companies involved in the transport execution can see the custom field 'everyone' - all parties that can see the transport (or part of it) can see the custom field value, this includes the consignee
+        required:
+          - value
+    Timeslot:
+      type: object
+      description: Expected time range for loading/unloading
+      properties:
+        begin:
+          type: string
+          format: date-time
+          description: Begin time of timeslot in ISO8601 format
+        end:
+          type: string
+          format: date-time
+          description: End time for timeslot in ISO8601 format
+      required:
+        - begin
+        - end
+    Delivery:
+      type: object
+      description: Delivery information
+      oneOf:
+        - $ref: '#/components/schemas/DeliveryWithDeliveryId'
+        - $ref: '#/components/schemas/DeliveryWithBookingNumber'
+    DeliveryBase:
+      type: object
+      description: Delivery information
+      properties:
+        delivery_id:
+          type: string
+          description: Unique ID of the delivery
+          example: '123'
+        booking_number:
+          type: string
+          description: Unique ID of the booking
+          example: '123'
+        purchase_order_number:
+          type: string
+          description: Purchase order number provided to the consignee
+          example: '123'
+        order_number:
+          type: string
+          description: Order number assigned to this delivery
+          example: '123'
+        delivery_number:
+          type: string
+          description: Descriptive delivery number
+          example: '123'
+        custom_fields:
+          $ref: '#/components/schemas/CustomFields'
+        loading:
+          $ref: '#/components/schemas/DeliveryStation'
+        waypoint:
+          $ref: '#/components/schemas/DeliveryStation'
+        unloading:
+          $ref: '#/components/schemas/DeliveryStation'
+    PlaceReference:
+      type: object
+      description: Place Reference
+      properties:
+        place_reference_id:
+          type: string
+          description: Reference to an existing Visibility Hub Place
+      required:
+        - place_reference_id
+    DeliveryStation:
+      description: A planned stop/station (e.g. for loading) of a transport
+      properties:
+        location:
+          description: Location of the loading/unloading station
+          allOf:
+            - $ref: '#/components/schemas/DeliveryStationLocation'
+        place_reference:
+          $ref: '#/components/schemas/PlaceReference'
+        sequence_number:
+          type: number
+          description: |
+            Sequence number of the station within a transport. Note that this is not quaranteed to be unique in case the transport include multiple deliveries which are being served on the same station.
+          format: integer
+          minimum: 0
+        timeslot:
+          description: Timeslot booked for collection/delivery
+          allOf:
+            - $ref: '#/components/schemas/Timeslot'
+    DeliveryStationStatus:
+      type: object
+      description: Delivery status information
+      properties:
+        rtv_info:
+          description: Visibility info of particular delivery
+          oneOf:
+            - $ref: '#/components/schemas/Eta'
+            - $ref: '#/components/schemas/Ata'
+          discriminator:
+            propertyName: status
+            mapping:
+              unvisited: '#/components/schemas/Eta'
+              en_route: '#/components/schemas/Eta'
+              arrived: '#/components/schemas/Ata'
+              departed: '#/components/schemas/Ata'
+          type: object
+          properties:
+            status:
+              type: string
+              description: Status of the delivery relative to a station
+              example: unvisited
+              enum:
+                - unvisited
+                - en_route
+                - arrived
+                - departed
+          required:
+            - status
+        timeslot:
+          description: Timeslot booked for loading/unloading
+          allOf:
+            - $ref: '#/components/schemas/Timeslot'
+        location:
+          description: Location of the delivery station
+          allOf:
+            - $ref: '#/components/schemas/DeliveryStationLocation'
+        status_sharing_url:
+          type: string
+          description: Shareable URL to UI for the stop data
+          example: https://app.sixfold.com/go/<token>
+    DeliveryWithDeliveryId:
+      allOf:
+        - type: object
+          properties:
+            delivery_id:
+              type: string
+              description: Unique ID of the delivery
+              example: '123'
+          required:
+            - delivery_id
+        - $ref: '#/components/schemas/DeliveryBase'
+    DeliveryWithBookingNumber:
+      allOf:
+        - type: object
+          properties:
+            booking_number:
+              type: string
+              description: Unique ID of the booking
+              example: '123'
+          required:
+            - booking_number
+        - $ref: '#/components/schemas/DeliveryBase'
+    DeliveryEventQualifierEnum:
+      type: string
+      example: started
+      enum:
+        - started
+        - completed
+        - arrived
+        - departed
+        - heading_towards
+      description: |-
+        Delivery event qualifiers:
+         * `started` - Loading/Unloading of goods started
+         * `completed` - Loading/Unloading of goods completed
+         * `arrived` - Arrived to loading/unloading station, usually gate
+         * `departed` - Departed from loading/unloading station, left gate
+         * `heading_towards` - vehicle started to head towards delivery loading/unloading
+    DeliveryEventContents:
+      type: object
+      description: Status information about the delivery
+      properties:
+        event_id:
+          type: string
+          description: Unique id for this delivery event
+          example: 1a2b3c
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of transport delivery event in ISO8601 format
+        qualifier:
+          $ref: '#/components/schemas/DeliveryEventQualifierEnum'
+        qualifier_custom:
+          type: string
+          description: Custom qualifier that describes what the event is about
+          example: delivery loading completed
+        position:
+          $ref: '#/components/schemas/GeoPosition'
+        deleted_at:
+          type: string
+          format: date-time
+          description: Timestamp of the deletion of this event in ISO8601 format. Set this field to current time to delete previously sent event.
+      required:
+        - event_id
+        - timestamp
+    DeliveryStatusContent:
+      type: object
+      description: Status information about the delivery
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the eta calculation in ISO8601 format
+        eta:
+          type: string
+          format: date-time
+          description: Estimated time of arrival
+        estimated_remaining_distance_meters:
+          type: number
+          format: double
+          description: Estimated remaining distance to the station in meters
+          example: 5000.151
+        events:
+          type: array
+          maxItems: 100
+          description: List of new delivery events
+          items:
+            $ref: '#/components/schemas/DeliveryEventContents'
+    VehicleStatus:
+      type: object
+      description: Status information about the vehicle carrying out the transport order if there is such a vehicle in the current context.
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: The timestamp of the status update received from the vehicle in ISO8601 format
+        position:
+          $ref: '#/components/schemas/GeoPosition'
+        speed:
+          type: number
+          format: double
+          description: The speed of the vehicle in km/h
+          example: 90.5
+        heading:
+          type: number
+          format: double
+          description: The heading of the vehicle in degrees where 0 is pointing north, increasing clockwise.
+          example: 274.15
+      required:
+        - timestamp
+        - position
+    VehicleData:
+      type: object
+      description: Information about the vehicle carrying out the transport order if there is such a vehicle in the current context.
+      properties:
+        license_plate_number:
+          type: string
+          description: License plate of the vehicle
+          example: 001ABC
+    Eta:
+      type: object
+      description: Estimated time of arrival, only present if loading/unloading station is not visited yet.
+      properties:
+        status:
+          type: string
+          enum:
+            - unvisited
+            - en_route
+        eta_checked_at:
+          type: string
+          format: date-time
+          description: Timestamp of the eta calculation in ISO8601 format
+        eta:
+          type: string
+          format: date-time
+          description: Estimated time of arrival in ISO8601 format
+        estimated_remaining_distance:
+          type: number
+          format: double
+          description: Estimated remaining distance to the loading/unloading station in meters
+          example: 5000.151
+        eta_status:
+          type: string
+          enum:
+            - on_time
+            - delay_possible
+            - delayed
+          description: Severity of datetime value in "eta" field.
+          example: on_time
+        eta_source:
+          type: string
+          description: Specifies if ETA was calculated by Transporeon Visibility (internal) or provided by external source (external).
+          example: internal
+          enum:
+            - internal
+            - external
+    Ata:
+      type: object
+      description: Actual time of arrival, only present if vehicle is at loading/unloading station or it has been visited.
+      properties:
+        status:
+          type: string
+          enum:
+            - at_stop
+            - departed
+        ata:
+          type: string
+          format: date-time
+          description: Actual time of arrival in ISO8601 format
+        atd:
+          type: string
+          format: date-time
+          description: Actual time of departure in ISO8601 format
+        delay_duration:
+          type: string
+          description: Delay in ISO8601 duration format. Amount of time visiting this loading/unloading station was delayed.
+          example: PT2H30M
+        ata_status:
+          type: string
+          enum:
+            - on_time
+            - delayed
+          description: Shows whether truck arrived at loading/unloading station on time or was delayed.
+    ReeferSensorReading:
+      type: object
+      properties:
+        compartment_id:
+          type: string
+          example: compartment-1
+        sensor_id:
+          type: string
+          example: sensor-1
+        temperature:
+          type: number
+          description: Temperature reading of the sensor in Celsius
+        is_compartment_door_open:
+          type: boolean
+          description: Indicates whether the compartment door is open
+          example: false
+      required:
+        - compartment_id
+        - sensor_id
+        - temperature
+    Temperatures:
+      type: object
+      description: Temperature information of the assigned vehicle
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: The timestamp of the temperature reading received from the vehicle in ISO8601 format
+        reefer_id:
+          type: string
+          description: ID of the reefer
+          example: reefer-1
+        sensor_readings:
+          type: array
+          description: Sensor readings of compartments
+          items:
+            $ref: '#/components/schemas/ReeferSensorReading'
+      required:
+        - timestamp
+        - reefer_id
+        - sensor_readings
+    TransportStatusDelivery:
+      type: object
+      description: Delivery information. Some of the fields, like `vehicle_telemetry`, `vehicle_data` and `temperatures` only exist when the transport is being tracked on a delivery level.
+      allOf:
+        - $ref: '#/components/schemas/Delivery'
+        - type: object
+          properties:
+            delivery_sharing_url:
+              type: string
+              description: Shareable URL to UI for the delivery data
+              deprecated: true
+              example: https://app.sixfold.com/go/<token>
+            loading:
+              $ref: '#/components/schemas/DeliveryStationStatus'
+            waypoint:
+              $ref: '#/components/schemas/DeliveryStationStatus'
+            unloading:
+              $ref: '#/components/schemas/DeliveryStationStatus'
+            vehicle_telemetry:
+              $ref: '#/components/schemas/VehicleStatus'
+            vehicle_data:
+              $ref: '#/components/schemas/VehicleData'
+            temperatures:
+              type: array
+              items:
+                $ref: '#/components/schemas/Temperatures'
+    TransportStatusRTVInfo:
+      type: object
+      description: Real-time visibility information about the transport
+      properties:
+        visibility:
+          type: object
+          description: Visibility information of the transport. It will only be populated when transport is in finished state.
+          properties:
+            visibility_index:
+              type: number
+              description: Visibility index of the transport
+              example: 0.8
+            main_visibility_issue:
+              type: string
+              description: Main visibility issue of the transport. The consumer of this data must accept enums added in the future.
+              example: missing_telemetry
+              enum:
+                - early_loading_visit
+                - infrequent_telemetry
+                - missing_telemetry
+                - late_allocation
+                - vehicle_not_integrated
+                - late_telemetry
+                - no_vehicle_allocated
+                - unvisited_stops
+    CancellationReasonEnum:
+      type: string
+      example: bad_tour_data
+      enum:
+        - aborted
+        - bad_telemetry
+        - bad_tour_data
+        - carrier_not_registered
+        - data_sharing_issue
+        - missing_stop_geocoding
+        - missing_stop_timeslot
+        - missing_telemetry
+        - no_vehicle_allocated
+        - visibility_threshold_exceeded
+        - tractor_switch_failed
+        - insufficient_allocation
+      description: |
+        This list is not final and the receiving service must accept values unknown to it yet.
+    OceanTransportCancellationReasonEnum:
+      type: string
+      example: deleted
+      enum:
+        - deleted
+
+      description: |
+        This list is not final and the receiving service must accept values unknown to it yet.   
+    AirTransportCancellationReasonEnum:
+      type: string
+      example: deleted
+      enum:
+        - deleted
+
+      description: |
+        This list is not final and the receiving service must accept values unknown to it yet.         
+    TransportStatus:
+      type: object
+      properties:
+        transport_number:
+          type: string
+          description: Shipper-assigned transport number
+          example: T1234
+        transport_id:
+          type: string
+          description: Transpoeon-assigned transport number
+          example: '983549358'
+        tracking_start_time:
+          type: string
+          format: date-time
+          description: Expected transport tracking start time in ISO8601 format
+        transport_sharing_url:
+          type: string
+          description: Shareable URL to UI for the transport and real-time visibility data
+          example: https://app.sixfold.com/go/<token>
+        vehicle_telemetry:
+          $ref: '#/components/schemas/VehicleStatus'
+        vehicle_data:
+          $ref: '#/components/schemas/VehicleData'
+        deliveries:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransportStatusDelivery'
+        temperatures:
+          type: array
+          items:
+            $ref: '#/components/schemas/Temperatures'
+        custom_fields:
+          $ref: '#/components/schemas/CustomFields'
+        cancellation_reason:
+          type: object
+          properties:
+            label:
+              $ref: '#/components/schemas/CancellationReasonEnum'
+          required:
+            - label
+        state:
+          $ref: '#/components/schemas/TrackingState'
+        rtv_info:
+          $ref: '#/components/schemas/TransportStatusRTVInfo'
+      required:
+        - deliveries
+        - state
+        
+        
+    OceanTransportStatus:
+      type: object
+      properties:
+        transport_number:
+          type: string
+          description: Shipper-assigned transport number
+          example: T1234
+        transport_id:
+          type: string
+          description: Visibility Hub-assigned transport number
+          example: '983549358'
+        tracking_start_time:
+          type: string
+          format: date-time
+          description: Expected transport tracking start time in ISO8601 format
+        transport_sharing_url:
+          type: string
+          description: Shareable URL to UI for the transport and real-time visibility data
+          example: https://app.sixfold.com/go/<token>
+        load_type:
+          $ref: '#/components/schemas/OceanLoadType'          
+        bill_of_lading:
+          type: string
+          description:
+        booking_number:
+          type: string
+          description:
+        container_number:
+          type: string
+          description: 
+        ocean_carrier:
+          $ref: '#/components/schemas/Carrier'         
+        container_type:
+          type: string
+          description:          
+        co2:
+          type: number
+          description:          
+        stops:
+          type: array
+          description: List of stops associated with the Transport. Stops are ordered with its sequence number.
+          items:
+           $ref: '#/components/schemas/OceanTransportStopWithoutTimeSlot'
+        milestones:
+          type: array
+          description: 
+          items:
+           $ref: "#/components/schemas/OceanMilestone"             
+        custom_fields:
+          $ref: '#/components/schemas/CustomFields'  
+        cancellation_reason:
+          type: object
+          properties:
+            label:
+              $ref: '#/components/schemas/OceanTransportCancellationReasonEnum'
+          required:
+            - label
+        tracking_state:
+          $ref: '#/components/schemas/OceanTransportTrackingState'  
+      required:
+        - stops
+
+        - transport_id
+        - transport_number        
+        
+    OceanMilestone:
+      type: object
+      properties:
+        milestone_type:
+          type: string
+          anyOf:
+            - $ref: '#/components/schemas/OceanMilestoneTypes'
+
+        sequence:
+          type: integer
+          example: 1
+          description: this tells the position/sequence of this milestone at that stop/location.
+
+        vessel:
+          description: Details of the vessel used for transport one of name,imo,mmsi needed
+          $ref: '#/components/schemas/VesselDetails'
+          
+        timestamps:
+          type: array
+          items:
+            $ref: "#/components/schemas/Timestamp"
+          description: List of timestamps (planned, actual, estimate) for the milestone.
+        stop_id:
+          type: string
+          description: visibility hub unique reference for the stop.
+      required:
+        - milestone_type
+        - sequence
+        - stop_id        
+        - transport_id        
+
+    AirMilestone:
+      type: object
+      properties:
+        milestone_type:
+          type: string
+          anyOf:
+            - $ref: '#/components/schemas/AirMilestoneTypes'
+        sequence:
+          type: integer
+          example: 1
+          description: this tells the position/sequence of this milestone at that location.
+
+        flight_number:
+          type: string
+         
+        package_count:
+          type: number        
+        timestamps:
+          type: array
+          items:
+            $ref: "#/components/schemas/Timestamp"
+          description: List of timestamps (planned, actual, estimate) for the milestone.
+        stop_id:
+          type: string
+          description: visibility hub unique reference for the stop. 
+      required:
+        - milestone_type
+        - sequence
+        - stop_id  
+
+    Timestamp:
+      title: DateTime
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [Planned, Actual, Estimate]
+          description: The type of the timestamp.
+        timeStamp:
+          type: string
+          format: date-time
+          example: "2022-11-29T17:51:00.000+08:00"
+          description: timestamp is in local timezone of that location.
+
+        source_type:
+          type: string
+          anyOf:
+            - $ref: '#/components/schemas/AirSourceTypes'
+            - $ref: '#/components/schemas/OceanSourceTypes'
+          example: carrier_web
+          description: type of the source
+        source:
+          type: string
+          example: "Maersk"
+          description: source details
+          
+    AirSourceTypes:
+      type: string
+      enum:
+        [
+          carrier_web,
+          transport_data,
+          calculated,
+          aggregator_api
+        ]
+      example: carrier_web
+      description: >
+        source from which the event is generated for air. (customized field)
+        Deprecated values are WEB,SHIPMENT_DATA,Calculated,CHAMP. These deprecated values should not be used in new implementations.
+
+    OceanSourceTypes:
+      type: string
+      enum:
+        [
+          container_terminal_api,
+          container_terminal_web,
+          container_terminal_edi,
+          carrier_api,
+          carrier_web,
+          carrier_edi,
+          derived_same_vessel_transport,
+          port_terminal,
+          port_terminal_api,
+          port_terminal_web,
+          transport_data,
+          ais_port_calling,
+          determined_ais,
+          calculated,
+          predicted,
+          derived_road_visibility
+        ]
+      example: carrier_api
+      description: >
+        source from which the event is generated for ocean. (customized field)
+        Deprecated values are TERMINAL CONTAINER, API, WEB, CargoSmart, CMA CGM API, INTTRA, IFTSTA, SSC API, DERIVED, TERMINAL WEB SITE, TERMINAL_SITE, SHIPMENT_DATA, AIS_PORTCALLING, AIS WEB, ECT, CSD, AIS, NXT_PORT_VESSEL, GREENLIGHT, Calculated, ECU Line API, Predictive_High, Predictive_Low, VH_RTV. These deprecated values should not be used in new implementations.
+        port_terminal will soon be deprecated.
+ 
+ 
+    AirMilestoneTypes:
+      type: string
+      enum:
+        [
+          pick_up,
+          intransit_arrival,
+          intransit_departure,
+          gate_out,
+          inland_arrival,
+          booking_confirmation,
+          received_from_shipper,
+          manifested,
+          flight_departure,
+          flight_arrival,
+          received_from_flight,
+          documents_delivered,
+          delivered
+        ]
+      example: flightArrivalTime
+      description: this contains the name of the air milestone.
+      
+    OceanMilestoneTypes:
+      type: string
+      enum:
+        [
+          intransit_empty_arrival,
+          intransit_empty_departure,
+          pick_up,
+          intransit_arrival,
+          intransit_departure,
+          gate_in,
+          gate_out,
+          loading,
+          vessel_departure,
+          vessel_arrival,
+          discharge,
+          empty_gate_in,
+          empty_gate_out,
+          inland_arrival,
+          intransit_gate_in
+          intransit_gate_out
+        ]
+      example: loadingTime
+      description: this contains the name of the ocean milestone.
+
+    AirTransportStatus:
+      type: object
+      properties:
+        transport_number:
+          type: string
+          description: Shipper-assigned transport number
+          example: T1234
+        transport_id:
+          type: string
+          description: Visibility Hub-assigned transport number
+          example: '983549358'
+        tracking_start_time:
+          type: string
+          format: date-time
+          description: Expected transport tracking start time in ISO8601 format
+        transport_sharing_url:
+          type: string
+          description: Shareable URL to UI for the transport and real-time visibility data
+          example: https://app.sixfold.com/go/<token>
+        co2:
+          type: number
+          description:  
+        air_carrier:
+          $ref: '#/components/schemas/Carrier'
+        client_package_count:
+          type: number
+          description:  Number of packages as reported by the client
+        carrier_package_count:
+          type: number
+          description:  Number of packages as reported by the carrier          
+       
+        stops:
+          type: array
+          description: List of stops associated with the Transport. Stops are ordered with its sequence number.
+          items:
+           $ref: '#/components/schemas/AirTransportStopWithouTimeSlot'
+        milestones:
+          type: array
+          description: 
+          items:
+           $ref: "#/components/schemas/AirMilestone"             
+        custom_fields:
+          $ref: '#/components/schemas/CustomFields'
+        cancellation_reason:
+          type: object
+          properties:
+            label:
+              $ref: '#/components/schemas/AirTransportCancellationReasonEnum'
+          required:
+            - label
+        tracking_state:
+          $ref: '#/components/schemas/AirTransportTrackingState'          
+
+      required:
+
+        - stops        
+        - transport_id
+        - transport_number  
+        
+    TrackingState:
+      type: object
+      properties:
+        label:
+          type: string
+          description: Human readable label of the state of the transport. Can be any string and the values returned are a subject to change in the future.
+        is_working:
+          type: boolean
+          example: false
+        is_finished:
+          type: boolean
+          example: true
+      required:
+        - label
+        - is_finished
+    OceanTransportTrackingState:
+      type: object
+      properties:
+        label:
+          type: string
+          description: Human readable label of the state of the transport. Can be any string and the values returned are a subject to change in the future.
+
+        is_finished:
+          type: boolean
+          example: true
+    AirTransportTrackingState:
+      type: object
+      properties:
+        label:
+          type: string
+          description: Human readable label of the state of the transport. Can be any string and the values returned are a subject to change in the future.
+
+        is_finished:
+          type: boolean
+          example: true          
+      required:
+        - label
+        - is_finished        
+    TransportEventQualifierEnum:
+      type: string
+      example: departed
+      enum:
+        - completed
+        - tracking_started
+      description: |
+        Transport event qualifiers:
+         * `completed` - Transport was completed
+         * `tracking_started` - Tracking of the transport was started
+    AdditionalVehicleProperties:
+      type: object
+      properties:
+        direction:
+          type: number
+          description: Direction specified in degrees, 0° (points north) to 360°
+          example: 132
+          minimum: 0
+          maximum: 360
+        speed:
+          type: number
+          description: Kilometers per hour, km/h
+          example: 75
+          minimum: 0
+        odometer:
+          type: number
+          description: Current odometer reading on vehicle.
+          example: 523145
+          minimum: 0
+        is_engine_running:
+          type: boolean
+          example: false
+        front_axle_weight_kg:
+          type: number
+          format: double
+        rear_axle_weight_kg:
+          type: number
+          format: double
+        total_weight_kg:
+          type: number
+          format: double
+        altitude_meters:
+          type: number
+          example: 143
+        fuel_level_pct:
+          type: number
+          format: double
+          description: Fuel level percentage
+          example: 20.4
+        clean_source_pct:
+          type: number
+          format: double
+          description: Clean fuel percentage of usage, example biodiesel usage
+          example: 20.4
+        total_fuel_consumption_liters:
+          type: number
+          format: double
+          description: Total fuel consumption over time
+          example: 4004.11
+    TransportVehicleStatus:
+      type: object
+      description: Status information about the vehicle carrying out the transport order
+      allOf:
+        - type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+              description: The timestamp of the status update received from the vehicle.
+            position:
+              $ref: '#/components/schemas/GeoPosition'
+          required:
+            - timestamp
+            - position
+        - $ref: '#/components/schemas/AdditionalVehicleProperties'
+    LocationData:
+      type: object
+      description: Location data
+      properties:
+        name:
+          type: string
+          description: Location name
+          example: Sarroch oil terminal
+        locode:
+          type: string
+          description: Location's UN/LOCODE code
+          example: ITPFX
+    DeliveryStationLocation:
+      type: object
+      description: Delivery station location information
+      properties:
+        location_id:
+          type: string
+          description: Location ID
+          example: L1234
+        gate_id:
+          type: string
+          description: Gate ID
+          example: G2
+        gate:
+          type: string
+          description: Gate at the location
+          example: Gate 2
+        name:
+          type: string
+          description: Company name
+          example: Knight GmbH
+        booking_location_name:
+          type: string
+          description: Booking location name
+          example: Witzenhausen
+        address:
+          $ref: '#/components/schemas/Address'
+        position:
+          $ref: '#/components/schemas/GeoPosition'
+    GeoPosition:
+      type: object
+      description: Geographical position (WGS 84)
+      properties:
+        lat:
+          type: number
+          format: double
+          description: Latitude (North is positive)
+          example: 59.4365094
+        lng:
+          type: number
+          format: double
+          description: Longitude (East is positive)
+          example: 24.7428656
+      required:
+        - lat
+        - lng
+    Address:
+      properties:
+        street_address:
+          type: string
+          description: Street address (with house/floor/apartment, etc)
+          example: Niguliste 4
+        city:
+          type: string
+          description: City name
+          example: Tallinn
+        state:
+          type: string
+          description: State (e.g. for US, Canada)
+          example: Harjumaa
+        country:
+          type: string
+          description: Country code (ISO 3166-1 alpha-2)
+          example: EE
+        zipcode:
+          type: string
+          description: Postal code / zip code (country specific whether is prefixed by country code)
+          example: '10123'
+      required:
+        - country      
+    TransportEvent:
+      type: object
+      description: Vehicle and transport status event
+      properties:
+        event_id:
+          type: string
+          description: Unique id for this transport event
+          example: 1a2b3c
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the event in ISO8601 format
+        qualifier:
+          $ref: '#/components/schemas/TransportEventQualifierEnum'
+        qualifier_custom:
+          type: string
+          description: Custom qualifier that describes what the event is about
+          example: departed from Sarroch oil terminal
+        location_data:
+          $ref: '#/components/schemas/LocationData'
+        position:
+          $ref: '#/components/schemas/GeoPosition'
+        deleted_at:
+          type: string
+          format: date-time
+          description: Timestamp of the deletion of this event in ISO8601 format. Set this field to current time to delete previously sent event.
+      required:
+        - event_id
+        - timestamp
+    TransportEquipment:
+      type: object
+      description: Transport equipment
+      properties:
+        equipment_id:
+          type: string
+          description: Id of equipment
+          example: SANU7509529
+        equipment_type:
+          type: string
+          example: container
+          enum:
+            - container
+            - pallet
+            - parcel
+            - bulk
+          description: Type of equipment used to transport the goods.
+      required:
+        - equipment_id
+        - equipment_type
+    StatusUpdateVehicleData:
+      type: object
+      description: Vehicle data
+      properties:
+        license_plate_number:
+          type: string
+          description: License plate of the vehicle
+          example: ABC 123
+        vehicle_type:
+          type: string
+          example: tractor
+          default: tractor
+          enum:
+            - tractor
+            - trailer
+            - vessel
+            - barge
+            - rail
+            - terminal
+          description: Type of vehicle.
+        equipment_list:
+          type: array
+          description: List of equipment used to transport the goods.
+          items:
+            $ref: '#/components/schemas/TransportEquipment'
+        fuel_type:
+          type: string
+          example: cng
+          enum:
+            - diesel
+            - cng
+            - lng
+            - bev
+          description: |
+            Fuel type qualifiers: * `diesel` - Diesel engine fuel type * `cng` - Compressed Natural Gas (CNG) * `lng` - Liquefied Natural Gas (LNG) * `bev` - Battery Electric Vehicle (BEV)
+    TransportStatusUpdateContents:
+      type: object
+      description: Updates to the status of transport order
+      properties:
+        vehicle_telemetry:
+          $ref: '#/components/schemas/TransportVehicleStatus'
+        loading_status:
+          $ref: '#/components/schemas/DeliveryStatusContent'
+        unloading_status:
+          $ref: '#/components/schemas/DeliveryStatusContent'
+        transport_events:
+          type: array
+          description: List of vehicle and transport events
+          items:
+            $ref: '#/components/schemas/TransportEvent'
+        vehicle_data:
+          $ref: '#/components/schemas/StatusUpdateVehicleData'
+        temperatures:
+          type: array
+          maxItems: 100
+          description: List of temperature readings by reefer
+          items:
+            $ref: '#/components/schemas/Temperatures'
+            
+    OceanTransportStatusUpdateContents:
+      type: object
+      description: Updates to the status of transport order
+      properties:
+        transport_events:
+          type: array
+          description: List of transport events
+          items:
+            $ref: '#/components/schemas/OceanEventDetails'
+    AirTransportStatusUpdateContents:
+      type: object
+      description: Updates to the status of transport order
+      properties:
+        transport_events:
+          type: array
+          description: List of transport events
+          items:
+            $ref: '#/components/schemas/AirEventDetails'            
+            
+    TransportStatusUpdateByTransportId:
+      allOf:
+        - type: object
+          properties:
+            transport_id:
+              type: string
+              description: Transport ID
+              example: '983549358'
+          required:
+            - transport_id
+        - $ref: '#/components/schemas/TransportStatusUpdateContents'
+    TransportStatusUpdateByTransportNumber:
+      allOf:
+        - type: object
+          properties:
+            transport_number:
+              type: string
+              description: Transport number
+              example: '111111111'
+          required:
+            - transport_number
+        - $ref: '#/components/schemas/TransportStatusUpdateContents'
+    OceanTransportStatusUpdateByTransportId:
+      allOf:
+        - type: object
+          properties:
+            transport_id:
+              type: string
+              description: Transport ID
+              example: '983549358'
+          required:
+            - transport_id
+        - $ref: '#/components/schemas/OceanTransportStatusUpdateContents'
+    OceanTransportStatusUpdateByTransportNumber:
+      allOf:
+        - type: object
+          properties:
+            transport_number:
+              type: string
+              description: Transport number
+              example: '111111111'
+          required:
+            - transport_number
+        - $ref: '#/components/schemas/OceanTransportStatusUpdateContents'
+    AirTransportStatusUpdateByTransportId:
+      allOf:
+        - type: object
+          properties:
+            transport_id:
+              type: string
+              description: Transport ID
+              example: '983549358'
+          required:
+            - transport_id
+        - $ref: '#/components/schemas/AirTransportStatusUpdateContents'
+    AirTransportStatusUpdateByTransportNumber:
+      allOf:
+        - type: object
+          properties:
+            transport_number:
+              type: string
+              description: Transport number
+              example: '111111111'
+          required:
+            - transport_number
+        - $ref: '#/components/schemas/AirTransportStatusUpdateContents'        
+        
+    TransportDeliveryStatusUpdateContents:
+      type: object
+      description: Updates to the status of transport order
+      properties:
+        vehicle_telemetry:
+          $ref: '#/components/schemas/TransportVehicleStatus'
+        loading_status:
+          $ref: '#/components/schemas/DeliveryStatusContent'
+        unloading_status:
+          $ref: '#/components/schemas/DeliveryStatusContent'
+        vehicle_data:
+          $ref: '#/components/schemas/StatusUpdateVehicleData'
+        temperatures:
+          type: array
+          maxItems: 100
+          description: List of temperature readings by reefer
+          items:
+            $ref: '#/components/schemas/Temperatures'
+    TransportDeliveryStatusUpdateByDeliveryId:
+      allOf:
+        - type: object
+          properties:
+            delivery_id:
+              type: string
+              description: Delivery ID
+              example: '123456789'
+          required:
+            - delivery_id
+        - $ref: '#/components/schemas/TransportDeliveryStatusUpdateContents'
+    TransportDeliveryStatusUpdateByDeliveryNumber:
+      allOf:
+        - type: object
+          properties:
+            delivery_number:
+              type: string
+              description: Delivery number
+              example: '123456789'
+          required:
+            - delivery_number
+        - $ref: '#/components/schemas/TransportDeliveryStatusUpdateContents'
+    TransportDeliveryStatusUpdateByPurchaseOrderNumber:
+      allOf:
+        - type: object
+          properties:
+            purchase_order_number:
+              type: string
+              description: Purchase order number
+              example: '123456789'
+          required:
+            - purchase_order_number
+        - $ref: '#/components/schemas/TransportDeliveryStatusUpdateContents'
+    TransportDeliveryStatusUpdateByOrderNumber:
+      allOf:
+        - type: object
+          properties:
+            order_number:
+              type: string
+              description: Order number
+              example: '123456789'
+          required:
+            - order_number
+        - $ref: '#/components/schemas/TransportDeliveryStatusUpdateContents'
+    TransportDeliveryStatusUpdateByCustomField:
+      allOf:
+        - type: object
+          properties:
+            custom_field:
+              type: object
+              properties:
+                field_name:
+                  type: string
+                value:
+                  type: string
+              required:
+                - field_name
+                - value
+          required:
+            - custom_field
+        - $ref: '#/components/schemas/TransportDeliveryStatusUpdateContents'
+    TransportStatusUpdate:
+      description: Update to the status of transport order
+      oneOf:
+        - $ref: '#/components/schemas/TransportStatusUpdateByTransportId'
+        - $ref: '#/components/schemas/TransportStatusUpdateByTransportNumber'
+        - $ref: '#/components/schemas/TransportDeliveryStatusUpdateByDeliveryId'
+        - $ref: '#/components/schemas/TransportDeliveryStatusUpdateByDeliveryNumber'
+        - $ref: '#/components/schemas/TransportDeliveryStatusUpdateByPurchaseOrderNumber'
+        - $ref: '#/components/schemas/TransportDeliveryStatusUpdateByOrderNumber'
+        - $ref: '#/components/schemas/TransportDeliveryStatusUpdateByCustomField'
+        
+    OceanTransportStatusUpdate:
+      description: Update to the status of transport order
+      oneOf:
+        - $ref: '#/components/schemas/OceanTransportStatusUpdateByTransportId'
+        - $ref: '#/components/schemas/OceanTransportStatusUpdateByTransportNumber'
+
+
+    AirTransportStatusUpdate:
+      description: Update to the status of transport order
+      oneOf:
+        - $ref: '#/components/schemas/AirTransportStatusUpdateByTransportId'
+        - $ref: '#/components/schemas/AirTransportStatusUpdateByTransportNumber'
+        
+    IntegrationIdentifiers:
+      type: string
+      enum:
+        - trucker_tools
+    TransportStatusV2:
+      type: object
+      description: Update to the status of transport order
+      properties:
+        transport_id:
+          type: string
+          description: Transporeon provided transport ID
+          example: 37b202a5-8c17-4dcb-bf5a-f58b8129d87a
+        transport_number:
+          type: string
+          description: Transport owner/creator-assigned transport number
+          example: 1233323232
+        transport_private_url:
+          type: string
+          description: URL to the transport in the Transporeon Visibility Hub that requires authentication
+          example: https://app.sixfold.com/companies/123/transports/123467890
+        transport_public_url:
+          type: string
+          description: Shareable URL to UI for the transport and real-time visibility data without login requirements
+          example: https://app.sixfold.com/go/1233323232
+        delivery_items:
+          type: array
+          description: List of delivery orders associated with a transport. Can be empty array
+          items:
+            $ref: '#/components/schemas/DeliveryItem'
+        locations:
+          type: array
+          description: List of locations associated with transport
+          items:
+            $ref: '#/components/schemas/LocationOutput'
+        milestones:
+          type: array
+          description: Transport milestones
+          items:
+            $ref: '#/components/schemas/TransportMilestoneV2'
+        custom_fields:
+          $ref: '#/components/schemas/CustomFields'
+        tracking_state:
+          $ref: '#/components/schemas/TrackingState'
+      required:
+        - transport_id
+        - transport_private_url
+        - locations
+        - milestones
+    Error:
+      type: object
+      description: Content of error responses
+      properties:
+        detail:
+          type: string
+          description: Free form, human readable error message text
+          example: 'The request can not be fulfilled ... '
+        code:
+          type: string
+          description: Error code to be used by machines
+          example: a5ge521f
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the event in ISO8601 format
+        title:
+          type: string
+          description: Short description of the error
+          example: Something bad happened
+      required:
+        - timestamp
+        - title
+    PageInfo:
+      type: object
+      description: Pagination metadata
+      properties:
+        cursor:
+          type: string
+          description: Cursor to request the next page of items. Omitted if no next page.
+          example: c2l4Zm9sZF9hcGlfZXhhbXBsZQ==
+    WebhookPayload:
+      type: object
+      properties:
+        entity_id:
+          type: string
+          description: The ID of entity, which is the main subject of this event.
+          example: 1541ABC
+        topic:
+          type: string
+          description: The topic to which the event belongs to. Based on this, it is possible to derive the expect structure of the payload.
+          example: transport-rtv-update
+        event_id:
+          type: string
+          description: ID of this particular event, which stays consistent even over multiple retry attempts.
+          example: 314159-AEXXZ-124151
+        source_ts:
+          type: string
+          format: date-time
+          description: The timestamp of underlying event, which triggered this event, in ISO8601 format
+        company_id:
+          type: string
+          description: The company ID to which the webhook belongs to.
+          example: '124151'
+        delivery_attempts:
+          type: number
+          description: The number of attempts this delivery has been tried to deliver before. Notice that it is only present when the attempt count is two or larger. In case there have been no retries yet (on delivery attempt nr 1), this field is missing.
+          example: 1
+        demo:
+          type: boolean
+          description: True in case the data should be discarded and is sent only for demo purposes (For testing the endpoint). Note that this boolean is usually not present, unless it is true. The demo boolean feature is currently reserved for the future features in the webhook API, which would ease the development and the following testing. The demo payload is only intended to be invoked by the webhook consumer developers and is not a part of default webhook flow.
+          example: true
+        payload:
+         oneOf:
+            - $ref: '#/components/schemas/OceanTransportStatus'
+            - $ref: '#/components/schemas/AirTransportStatus'
+            - $ref: '#/components/schemas/TransportStatus'
+      required:
+        - payload
+        - entity_id
+        - topic
+        - event_id
+        - source_ts
+        - company_id
+    CompanyProfile:
+      type: object
+      description: Company profile information
+      properties:
+        company_id:
+          type: string
+          description: Transporeon company ID
+          example: '1337'
+        company_name:
+          type: string
+          description: Company name
+          example: A Corp.
+      required:
+        - company_name
+    Transport:
+      type: object
+      properties:
+        transport_id:
+          type: string
+          description: Transport ID
+          example: '314159'
+        visibility_stakeholders:
+          type: array
+          description: An array of the companies holding a stake in the visibility of this transport. The array is ordered from owner of the transport to the executing carrier. Note that depending on the requester position, not every stakeholder might be visible.
+          items:
+            $ref: '#/components/schemas/CompanyProfile'
+        allocation:
+          $ref: '#/components/schemas/Allocation'
+        transport_number:
+          type: string
+          description: Shipper-assigned transport number
+          example: T1234
+        start_time:
+          type: string
+          format: date-time
+          description: Expected start time of the transport in ISO8601 format
+        deliveries:
+          type: array
+          description: List of deliveries associated with the transport.
+          items:
+            $ref: '#/components/schemas/Delivery'
+        custom_fields:
+          $ref: '#/components/schemas/CustomFields'
+      required:
+        - transport_id
+        - deliveries
+    VehicleAllocationCreateContents:
+      type: object
+      properties:
+        license_plate_number:
+          type: string
+          description: License plate
+          example: 123 ABC
+        start_tracking_at:
+          type: string
+          format: date-time
+          description: Time to start tracking this vehicle in ISO8601 format
+        allocation_switch_type:
+          type: string
+          enum:
+            - auto_switch
+          description: Type of how the allocation switch is performed. For details, see user guide.
+        integration_identifier:
+          $ref: '#/components/schemas/IntegrationIdentifiers'
+      required:
+        - license_plate_number
+    Integration:
+      type: object
+      properties:
+        integration_id:
+          type: string
+          description: ID of the integration
+          example: '35'
+        provider_id:
+          type: string
+          description: unique provider id
+          example: gpsfreund
+        integration_instructions_url:
+          type: string
+          description: URL to the telematics integration instructions for more context about the setup.
+          example: https://sixfold.com/url
+        allowed_operations:
+          type: array
+          items:
+            type: string
+            enum:
+              - manage_vehicles
+      required:
+        - integration_id
+        - provider_id
+    IntegrationVehicle:
+      type: object
+      properties:
+        license_plate:
+          type: string
+          description: License plate number
+          example: 123ABC
+        integration_vehicle_id:
+          type: string
+          description: The unique id of the vehicle on the FMS side
+          example: abc
+      required:
+        - license_plate
+        - integration_vehicle_id
+    Vehicle:
+      type: object
+      properties:
+        integrations:
+          type: array
+          items:
+            properties:
+              integration_id:
+                type: string
+                description: ID of the integration
+                example: '35'
+              integration_vehicle_id:
+                type: string
+                description: The unique id of the vehicle on the FMS side
+                example: abc
+            required:
+              - integration_id
+              - integration_vehicle_id
+        license_plate_number:
+          type: string
+          description: License plate number
+          example: 123ABC
+        is_own_vehicle:
+          type: boolean
+          description: Whether this vehicle belongs to the requesting company
+          example: true
+        vehicle_position:
+          type: object
+          description: Vehicle last known position (if available) and timestamp of its recording
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+              description: Timestamp of the event in ISO8601 format
+            speed:
+              type: number
+              description: Vehicle speed at the time (km/h)
+            heading:
+              type: number
+              description: Vehicle heading in degrees. 0-360. 0 is north and the angle increases in clock direction.
+            position:
+              $ref: '#/components/schemas/GeoPosition'
+          required:
+            - timestamp
+      required:
+        - license_plate_number
+    Partner:
+      type: object
+      properties:
+        company_id:
+          type: string
+          description: Transporeon ID of the company
+          example: '321123'
+        company_name:
+          type: string
+          description: Company name
+          example: Moko Co Inc
+        onboarding_status:
+          type: object
+          deprecated: true
+          description: Deprecated - use signup_status instead
+          properties:
+            is_onboarded:
+              type: boolean
+              example: true
+            label:
+              type: string
+              description: Human readable label of the onboarding status. Can be any string and the values returned are a subject to change in the future.
+            is_blocked:
+              type: boolean
+              example: false
+            is_in_progress:
+              type: boolean
+              example: false
+          required:
+            - is_onboarded
+            - label
+        signup_status:
+          type: object
+          description: Company onboarding current status
+          properties:
+            is_onboarded:
+              type: boolean
+              description: Indicates whether the company has finished registration, connected a visibility source and is now responsible for providing real-time visibility.
+              example: true
+            label:
+              type: string
+              description: Human readable label of the onboarding status. Values returned are subject to change in the future.
+              example: Visibility source pending
+          required:
+            - is_onboarded
+            - label
+        vat_numbers:
+          type: array
+          items:
+            properties:
+              value:
+                type: string
+                description: Value-added tax (VAT)
+                example: DE43434343
+            required:
+              - value
+        is_shipper:
+          type: boolean
+          description: Company is a shipper
+        is_carrier:
+          type: boolean
+          description: Company is a carrier
+        relation_reference_names:
+          type: array
+          items:
+            type: string
+            description: Reference names of the relations
+            example: My Relation Name 1
+        relation_identifiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PartnerRelationIdentifier'
+      required:
+        - company_id
+        - vat_numbers
+    PartnerRelationIdentifier:
+      type: object
+      properties:
+        identifier_value:
+          type: string
+          description: Identifier value
+          example: '123456'
+      required:
+        - identifier_value
+    PointGeometry:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - Point
+        coordinates:
+          type: array
+          items:
+            type: number
+          minItems: 2
+          maxItems: 2
+          description: Latitude and longitude of the point
+      required:
+        - type
+        - coordinates
+    CircleGeofence:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - Feature
+        properties:
+          type: object
+          properties:
+            radius_in_meters:
+              type: number
+              description: Geofence radius in meters
+          required:
+            - radius_in_meters
+        geometry:
+          $ref: '#/components/schemas/PointGeometry'
+      required:
+        - type
+        - properties
+        - geometry
+      example:
+        type: Feature
+        properties:
+          radius_in_meters: 200
+        geometry:
+          type: Point
+          coordinates:
+            - 48.8566
+            - 2.3522
+    PolygonGeofence:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - Feature
+          description: The type of the GeoJSON object
+        geometry:
+          type: object
+          properties:
+            type:
+              type: string
+              enum:
+                - Polygon
+              description: The type of the GeoJSON geometry
+            coordinates:
+              type: array
+              items:
+                type: array
+                items:
+                  type: number
+                minItems: 2
+                maxItems: 2
+              minItems: 4
+              maxItems: 100
+              description: Array of latitude-longitude coordinate pairs that define the polygon geofence
+          required:
+            - type
+            - coordinates
+      required:
+        - type
+        - geometry
+      example:
+        type: Feature
+        geometry:
+          type: Polygon
+          coordinates:
+            - - 48.8566
+              - 2.3522
+            - - 48.855799
+              - 2.3522
+            - - 48.856038
+              - 2.354739
+            - - 48.8566
+              - 2.3522
+    AddressDefault:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Address'
+        - properties:
+            name:
+              type: string
+              description: Company name
+              example: Knight GmbH
+            disable_address_matching:
+              type: boolean
+              description: Use address for place matching if provided address is valid
+              default: false
+    AddressAlias:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Address'
+        - properties:
+            name:
+              type: string
+              description: Company name
+              example: Knight GmbH
+      required:
+        - street_address
+        - city
+        - zipcode
+        - country
+    Place:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the place
+          example: Factory 1
+        address:
+          $ref: '#/components/schemas/AddressDefault'
+        geometry:
+          $ref: '#/components/schemas/PointGeometry'
+        geofence:
+          oneOf:
+            - $ref: '#/components/schemas/CircleGeofence'
+            - $ref: '#/components/schemas/PolygonGeofence'
+        address_aliases:
+          type: array
+          items:
+            $ref: '#/components/schemas/AddressAlias'
+          description: List of address aliaseses that can be used to match the place
+      required:
+        - name
+        - geometry
+    TransportEmissionsCalculationError:
+      type: object
+      properties:
+        error_type:
+          type: string
+          description: Type of calculation error
+          example: DISTANCE
+        error_code:
+          type: string
+          description: Specific error description
+          example: TOUR_WEIGHT_OUT_OF_ALLOWED_RANGE
+        error_message:
+          type: string
+          description: Additional error message
+          example: 'Skipping CO2 emissions calculation, weight data invalid, weightInTonnes: 0, main_mode: undefined'
+      required:
+        - error_type
+        - error_code
+    FuelBasedTransportEmissions:
+      type: object
+      properties:
+        accumulated_fuel_consumption_liters:
+          type: number
+        fuel_type:
+          type: string
+        co2_well_to_tank_tonnes:
+          type: number
+        co2_tank_to_wheel_tonnes:
+          type: number
+        co2_well_to_wheel_tonnes:
+          type: number
+        transport_activity_tonne_kms:
+          type: number
+        emissions_intensity_gram_per_tonne_kms:
+          type: number
+    CalculatedTransportEmissions:
+      type: object
+      properties:
+        total_emissions:
+          type: object
+          properties:
+            co2_well_to_tank_tonnes:
+              type: number
+            co2_tank_to_wheel_tonnes:
+              type: number
+            co2_well_to_wheel_tonnes:
+              type: number
+        legs:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransportEmissionsLeg'
+        cargo:
+          type: object
+          properties:
+            container_empty_weight:
+              type: number
+            tons_per_feu:
+              type: number
+              description: Weight of the cargo in tons per forty-foot equivalent unit (FEU)
+            tons_per_teu:
+              type: number
+              description: Weight of the cargo in tons per twenty-foot equivalent unit (TEU)
+            unit:
+              type: string
+              description: Unit of the cargo weight
+            volume_weight:
+              type: string
+              description: Volume weight category of the cargo (AVERAGE)
+              example: AVERAGE
+            weight:
+              type: number
+        transport_activity_tonne_kms:
+          type: number
+          description: Quantifies the weight of cargo transported over distance
+        emissions_intensity_gram_per_tonne_kms:
+          type: number
+          description: Quantifies emissions produced in grams per total transport activity
+      required:
+        - total_emissions
+        - legs
+        - cargo
+    TransportEmissionsLeg:
+      type: object
+      properties:
+        emissions:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                description: Type of emissions
+                example: CARBON_DIOXIDE
+              emission_mode:
+                type: string
+                description: Transport mode producing emissions
+                example: ROAD
+              unit:
+                type: string
+                description: Unit the emissions are measured in
+                example: TONNES
+              tank_to_wheel:
+                type: number
+                description: Emissions produced from tank to wheel
+              well_to_tank:
+                type: number
+                description: Emissions produced from well to tank
+              total:
+                type: number
+                description: Total emissions produced
+        transport_mode:
+          type: string
+          description: Transport mode of the transport legs
+          example: ROAD
+        start_location:
+          type: object
+          description: Start location of the transport leg in decimal coordinates
+          properties:
+            lat:
+              type: number
+            lng:
+              type: number
+        end_location:
+          type: object
+          description: Start location of the transport leg in decimal coordinates
+          properties:
+            lat:
+              type: number
+            lng:
+              type: number
+        type:
+          type: string
+          description: Type of the transport leg
+          example: PRE_CARRIAGE
+        deliveries:
+          type: array
+          items:
+            type: object
+            properties:
+              delivery_id:
+                type: string
+                description: Delivery IDs associated with the transport leg
+        carriage_parameters:
+          type: object
+          properties:
+            bio_fuel_share:
+              type: number
+              description: Share of bio fuel used in the transport leg
+            carriage_mode_parameters:
+              type: array
+              items:
+                $ref: '#/components/schemas/TransportEmissionsLegCarriageModeParameter'
+        distance_km:
+          type: number
+          description: Distance of the transport leg in kilometers
+        external_costs:
+          $ref: '#/components/schemas/TransportEmissionsLegExternalCosts'
+      required:
+        - emissions
+        - transport_mode
+        - start_location
+        - end_location
+        - type
+        - carriage_parameters
+    TransportEmissionsLegCarriageModeParameter:
+      type: object
+      properties:
+        mode:
+          type: string
+          description: Mode of transport
+          example: ROAD
+        emission_class:
+          type: string
+          description: Emissions standard class
+          example: EuEuro6ac
+        empty_run_factor:
+          type: number
+          description: Percentage of distance traveled without cargo
+        ferry_routing:
+          type: string
+          description: Ferry routing type
+          example: Normal
+        fuel_type:
+          type: string
+          description: Type of fuel used
+          example: diesel
+        load_factor:
+          type: number
+          description: percentage of the vehicle's capacity of cargo weight that is utilized
+        lorry_class:
+          type: string
+          description: Lorry class
+          example: Class40
+        drive_class:
+          type: string
+          description: Drive class
+        aircraft_type:
+          type: string
+          description: Specifies the type of aircraft used in case of air transport
+        sea_ship_type:
+          type: string
+          description: Specifies the type of vessel used in case of sea transport
+        inland_ship_type:
+          type: string
+          description: Specifies the type of vessel used in case of waterways transport
+      required:
+        - mode
+    TransportEmissionsLegExternalCosts:
+      type: object
+      properties:
+        currency:
+          type: string
+          description: Currency of cost values
+          example: Euro
+        accident_costs:
+          type: array
+          items:
+            type: object
+            properties:
+              transport_mode:
+                description: Mode of transport
+                example: ROAD
+              accident_cost_value:
+                type: number
+        noise_costs:
+          type: array
+          items:
+            type: object
+            properties:
+              transport_mode:
+                type: string
+                description: Mode of transport
+                example: ROAD
+              noise_costs_value:
+                type: number
+        emission_costs:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Type of emissions
+                example: SULFUR_DIOXIDES
+              tank_to_wheel:
+                type: number
+              well_to_tank:
+                type: number
+              total:
+                type: number
+        total_external_costs:
+          type: number
+      required:
+        - currency
+        - accident_costs
+        - noise_costs
+        - emission_costs
+        - total_external_costs
+    TransportEmissions:
+      type: object
+      properties:
+        transport_id:
+          type: string
+          description: Transport ID
+          example: '314159'
+        emissions_first_calculated_at:
+          type: string
+          format: date-time
+          description: Timestamp in ISO8601 format of the first calculation of emissions for the transport
+        emissions_latest_calculated_at:
+          type: string
+          format: date-time
+          description: Timestamp in ISO8601 format of the latest calculation of emissions for the transport
+        transport_number:
+          type: string
+          description: Shipper-assigned transport number
+          example: T1234
+        calculation_errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransportEmissionsCalculationError'
+        planned_emissions:
+          $ref: '#/components/schemas/CalculatedTransportEmissions'
+        driven_distance:
+          type: number
+          description: Distance driven
+          example: 253.4
+        driven_distance_source:
+          type: string
+          description: Source of the driven distance data
+        fuel_based_emissions:
+          $ref: '#/components/schemas/FuelBasedTransportEmissions'
+      required:
+        - transport_id
+        - emissions_calculated_at
+    TransportAlertContainer:
+      oneOf:
+        - $ref: '#/components/schemas/TransportAlertRoad'
+        - $ref: '#/components/schemas/TransportAlertOcean'
+      discriminator:
+        propertyName: source
+        mapping:
+          road_engine: '#/components/schemas/TransportAlertRoad'
+          ocean_engine: '#/components/schemas/TransportAlertOcean'
+      type: object
+      properties:
+        source:
+          type: string
+          enum:
+            - road_engine
+            - ocean_engine
+      required:
+        - source
+    WarningEnum:
+      type: string
+      example: stale_vehicle_status
+      enum:
+        - stale_vehicle_status
+        - pending_tractor_switch
+        - prerequisite_delivery_delayed
+        - stops_out_of_sequence
+        - telemetry_data_includes_long_jumps
+        - invalid_timeslot_data
+        - transport_event_telemetry_mismatch
+        - possible_wrong_truck
+        - based_on_platform_transport_events
+        - vehicle_not_integrated
+        - stop_missing_timeslot
+        - stop_missing_geocoding
+        - early_loading
+    WarningSeverityEnum:
+      type: string
+      example: warning
+      enum:
+        - info
+        - warning
+        - error
+    TransportWarning:
+      type: object
+      description: Information about potential or obvious issue currently associated to transport that may affect ETA accuracy and actual time of shipment arrival.
+      properties:
+        warning:
+          description: Code of potential or obvious issue regarding current transport that affects ETA calculation and actual time of shipment arrival. Value can be, but not necessarily always is one of the enumerated warnings.
+          oneOf:
+            - $ref: '#/components/schemas/WarningEnum'
+            - type: string
+              example: some_extra_warning
+        warning_text:
+          description: Additional optional explanation about this warning.
+          example: Outdated telemetry data, ETA currently not available
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the warning, if appliccable.
+        severity:
+          description: Warning severity level.
+          oneOf:
+            - $ref: '#/components/schemas/WarningSeverityEnum'
+            - type: string
+              example: warning
+      required:
+        - warning
+    TransportMilestoneV2:
+      description: Milestone of transport execution
+      properties:
+        location_id:
+          type: string
+          description: Reference number for stop from external platform
+          example: location1
+        milestone_type:
+          type: string
+          enum:
+            - arrived
+            - departed
+        actual_timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of actual time when milestone happened in ISO8601 format
+        planned_timestamps:
+          type: object
+          description: Planned timestamps for the milestone
+          properties:
+            planned_begin_timestamp:
+              type: string
+              format: date-time
+              description: Timestamp of planned begin timeslot when milestone should happen in ISO8601 format
+            planned_end_timestamp:
+              type: string
+              format: date-time
+              description: Timestamp of planned end timeslot when milestone should happen in ISO8601 format
+        estimated_timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of estimated time when milestone happens in ISO8601 format
+      required:
+        - milestone_id
+        - milestone_type
+        - location_id
+    TimestampSource:
+      type: string
+      oneOf:
+        - $ref: '#/components/schemas/AirEventSource'
+        - $ref: '#/components/schemas/OceanEventSource'
+      example: carrier_web
+      description: Explanation of the source of the timestamp
+    LocationOutput:
+      type: object
+      description: Location associated with transport
+      properties:
+        location_id:
+          type: string
+          description: Visibility Hub internal location ID
+          example: L1234
+        place_reference_id:
+          type: string
+          description: Unique reference ID of the place
+          example: P1234
+        name:
+          type: string
+          description: Name of the location
+          example: Sarroch oil terminal
+        stop_reference_number:
+          type: string
+          description: Reference number for stop from external platform
+          example: location1
+        location_reference_number:
+          type: string
+          description: Location reference ID provided externally
+          example: b30bdd06-c581-4248-a3a2-aab9f7f64feas
+        location_public_url:
+          type: string
+          description: Shareable URL to UI for the location
+          example: https://app.sixfold.com/go/<token>
+      required:
+        - location_id
+    DeliveryItem:
+      type: object
+      description: Information about the delivery item
+      properties:
+        delivery_item_type:
+          type: string
+          enum:
+            - delivery_order
+          description: Type of delivery item object
+        delivery_order_number:
+          type: string
+          description: ID of delivery order
+          example: MOCK227710
+        location_references:
+          type: array
+          description: stop_reference_number of stops
+          items:
+            $ref: '#/components/schemas/LocationReference'
+      required:
+        - delivery_item_type
+        - delivery_order_number
+    DeliveryItemMetadata:
+      type: object
+      additionalProperties:
+        type: string
+      description: Key value pair to store additional delivery object metadata
+      example:
+        container_color: Cyan
+        container_type: 40HC
+    DeliveryItemRoadUrls:
+      type: object
+      description: Object containing all urls for specific delivery item
+      properties:
+        delivery_item_loading_public_url:
+          type: string
+          description: Shareable URL to UI for the delivery status at delivery loading stop
+          example: https://app.sixfold.com/go/<token>
+        delivery_item_unloading_public_url:
+          type: string
+          description: Shareable URL to UI for the delivery status at delivery unloading stop
+          example: https://app.sixfold.com/go/<token>
+    Trip:
+      type: object
+      description: Information about the trip
+      properties:
+        trip_id:
+          type: string
+          description: ID of specific trip
+          example: trip999
+        previous_trip_ids:
+          type: array
+          items:
+            type: string
+          description: IDs of connected trips that preceding current trip if there is any
+          example:
+            - trip99
+            - trip100
+        trip_transport_method:
+          type: object
+          description: Information about the trip transportation
+          properties:
+            transport_method_type:
+              type: string
+              enum:
+                - ocean
+                - road
+                - air
+                - unknown
+              description: Transport method type for trip
+            identifiers:
+              type: array
+              items:
+                $ref: '#/components/schemas/TripTransportMethodIdentifiers'
+              description: Specifies what does delivery_item_id refers to
+          required:
+            - transport_method_type
+            - identifiers
+        milestone_ids:
+          type: array
+          items:
+            type: string
+          description: Milestones related to this trip
+          example:
+            - milestone_id1
+            - milestone_id2
+        delivery_item_ids:
+          type: array
+          description: Delivery item IDs related to this trip
+          items:
+            type: string
+          example:
+            - MOCK227710
+            - MOCK227718
+        latest_position:
+          $ref: '#/components/schemas/LatestPosition'
+        location_ids:
+          type: array
+          items:
+            type: string
+          description: Locations ids that are part of this trip
+          example:
+            - location_id1
+            - location_id2
+      required:
+        - trip_id
+        - trip_transport_method
+        - milestone_ids
+        - location_ids
+    TripTransportMethodIdentifiers:
+      type: object
+      description: Information about the trip transportation method
+      properties:
+        identifier_type:
+          type: string
+          enum:
+            - vessel_name
+            - license_plate_number
+            - iso
+            - vin
+            - imo
+            - mmsi
+          description: Trip transport method identifier type
+        identifier_value:
+          type: string
+          description: Transport method identifier value
+          example: Ever Given
+      required:
+        - identifier_type
+        - identifier_value
+    LatestPosition:
+      type: object
+      description: Information about the trip latest known position
+      properties:
+        last_tracked_time:
+          type: string
+          format: date-time
+          description: The timestamp of the last status update received from the vehicle.
+        position:
+          $ref: '#/components/schemas/GeoPosition'
+        visibility_source:
+          $ref: '#/components/schemas/VisibilitySourceBase'
+      required:
+        - last_tracked_time
+        - position
+    VisibilitySourceBase:
+      type: object
+      description: Information about the source of transport visibility event
+      properties:
+        primary_event_source:
+          description: This gives an option to filter out uninteresting events. For example, platform_api events were originally sent to Visibility Hub by platform itself and thus might be uninteresting. It also hints about the kind of source where event was first received to Visibility Hub.
+          oneOf:
+            - $ref: '#/components/schemas/VisibilityEventSourceEnum'
+            - type: string
+              example: some_extra_source
+      required:
+        - primary_event_source
+    VisibilityEventSourceEnum:
+      type: string
+      description: Enumerated type of the main source where event originated.
+      example: platform_api
+      enum:
+        - platform_api
+        - fms
+        - carrier_api
+        - platform_rtv_api
+        - mobile
+        - iot_tracker
+    AirEventSource:
+      type: string
+      enum:
+        - carrier_web
+        - transport_data
+        - calculated
+        - aggregator_api
+      example: carrier_web
+      description: Source from which the event is generated for air
+    OceanEventSource:
+      type: string
+      enum:
+        - container_terminal_api
+        - container_terminal_web
+        - container_terminal_edi
+        - carrier_api
+        - carrier_web
+        - carrier_edi
+        - derived_same_vessel_transport
+        - port_terminal
+        - port_terminal_api
+        - port_terminal_web
+        - transport_data
+        - ais_port_calling
+        - determined_ais
+        - calculated
+        - predicted
+        - derived_road_visibility
+      example: carrier_api
+      description: Source from which the event is generated for ocean
+    TransportAlertRoad:
+      type: object
+      allOf:
+        - type: object
+          properties:
+            type:
+              description: Specific type of the alert.
+              oneOf:
+                - $ref: '#/components/schemas/RoadAlertTypeEnum'
+                - type: string
+                  example: some_extra_alert
+        - $ref: '#/components/schemas/TransportAlert'
+    TransportAlertOcean:
+      type: object
+      allOf:
+        - type: object
+          properties:
+            id:
+              description: Specific alert ID for source ocean_engine.
+              type: string
+            type:
+              description: Specific type of the alert.
+              oneOf:
+                - $ref: '#/components/schemas/OceanAlertTypeEnum'
+                - type: string
+                  example: some_extra_alert
+        - $ref: '#/components/schemas/TransportAlert'
+    RoadAlertTypeEnum:
+      type: string
+      example: stale_vehicle_status
+      enum:
+        - stale_vehicle_status
+        - pending_tractor_switch
+        - prerequisite_delivery_delayed
+        - stops_out_of_sequence
+        - telemetry_data_includes_long_jumps
+        - invalid_timeslot_data
+        - transport_event_telemetry_mismatch
+        - possible_wrong_truck
+        - based_on_platform_transport_events
+        - vehicle_not_integrated
+        - stop_missing_timeslot
+        - stop_missing_geocoding
+        - early_loading
+    OceanAlertTypeEnum:
+      type: string
+      example: package_count_mismatch
+      enum:
+        - package_count_mismatch
+        - carrier_data_fetched_using_container_number
+        - carrier_no_data
+        - carrier_reference_not_accepted
+        - carrier_unsupported
+        - carrier_not_found
+        - delayed_arrival_at_destination
+        - delayed_arrival_at_pod
+        - delayed_departure_from_pol
+        - deviation_location_group
+        - deviation_route
+        - invalid_shipment_reference_bn
+        - invalid_shipment_reference_bol
+        - post_carriage_in_different_continents
+        - potentially_incorrect_route
+        - pre_carriage_in_different_continents
+        - reference_update
+        - container_rollover_at_pol
+        - container_rollover_at_tsp
+        - change_in_pol
+        - change_in_pod
+    TransportAlert:
+      type: object
+      properties:
+        source:
+          description: Source engine of the alert.
+          type: string
+          enum:
+            - road_engine
+            - ocean_engine
+        delivery_item_ids:
+          type: array
+          description: Delivery item IDs related to this alert.
+          items:
+            type: string
+          example:
+            - MOCK227710
+            - MOCK227718
+        text:
+          description: Additional optional explanation about this alert.
+          example: Outdated telemetry data, ETA currently not available
+          type: string
+        severity:
+          description: Alert severity level.
+          type: string
+          example: warning
+          enum:
+            - info
+            - warning
+            - critical
+            - blocker
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp of the alert creation, if appliccable.
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp of the alert update, if appliccable.
+      required:
+        - type
+        - source
+    TransportCreateUpdateResponse:
+      type: object
+      properties:
+        result:
+          type: string
+          example: OK
+        transport_number:
+          type: string
+          description: Transport owner/creator-assigned transport number
+          example: 1233323232
+        transport_id:
+          type: string
+          description: Transporeon generated transport ID
+          example: 84e2bcc9-f169-48cb-b5ab-281701431834
+    TransportCreateInput:
+      type: object
+      properties:
+        assigned_carrier_id_type:
+          $ref: '#/components/schemas/AssignedCarrierIdentifierType'
+          default: company_id
+        assigned_carrier_id_value:
+          type: string
+          description: Identifier value of assigned carrier. Value type is defined by **assigned_carrier_id_type** field
+          example: '444888'
+        customer_id:
+          type: string
+          description: Transporeon account ID of the customer for this transport
+          example: 851c3d1e-2e1e-4e63-b93a-c228b94a54bd
+        previous_transport_id:
+          type: array
+          description: transport_id of related transports that precede this transport
+          items:
+            type: string
+            example: d5f76a46-1564-41e5-b61e-0e4fdb1be3e2
+        load_type:
+          $ref: '#/components/schemas/LoadType'
+        custom_fields:
+          $ref: '#/components/schemas/CustomFields'
+      required:
+        - assigned_carrier_id_value
+        - stops
+    CreateRoadTransport:
+      type: object
+      properties:
+        assigned_carrier_id_type:
+          $ref: '#/components/schemas/AssignedCarrierIdentifierType'
+          default: company_id
+        assigned_carrier_id_value:
+          type: string
+          description: Identifier value of assigned carrier. Value type is defined by **assigned_carrier_id_type** field
+          example: '444888'
+        customer_id:
+          type: string
+          description: Transporeon account ID of the customer for this transport
+          example: 851c3d1e-2e1e-4e63-b93a-c228b94a54bd
+        stops:
+          type: array
+          description: List of stops associated with the Transport. Stops are ordered with its sequence number.
+          items:
+            $ref: '#/components/schemas/Stop'
+        delivery_items:
+          $ref: '#/components/schemas/DeliveryOrder'
+        custom_fields:
+          $ref: '#/components/schemas/CustomFields'
+        load_type:
+          $ref: '#/components/schemas/LoadType'
+        fuel_type_road:
+          $ref: '#/components/schemas/FuelTypeRoad'
+        vehicle_type_road:
+          $ref: '#/components/schemas/VehicleTypeRoad'
+        empty_trip_factor:
+          $ref: '#/components/schemas/EmptyTripFactor'
+        load_factor:
+          $ref: '#/components/schemas/LoadFactor'
+        emission_class:
+          $ref: '#/components/schemas/EmissionClass'
+        previous_transport_id:
+          type: array
+          description: transport_id of related transports that precede this transport
+          items:
+            type: string
+            example: d5f76a46-1564-41e5-b61e-0e4fdb1be3e2
+      required:
+        - assigned_carrier_id_value
+        - stops
+    CreateOceanTransport:
+      type: object
+      description: At least one of `bill_of_lading`, `booking_number`, or `equipment_details` must be provided
+      properties:
+        tracking_references:
+           type: array
+           description: List of tracking references for the transport
+           minItems: 1
+           maxItems: 3
+           items:
+             type: object
+             properties:
+               type:
+                 type: string
+                 description:   types are accepted when creating or updating a Transport
+                 enum:
+                   - bill_of_lading
+                   - booking_number
+                   - container_number
+               value:
+                 type: string
+                 description: The value of this identifier. Required field     
+             required:
+              - type
+              - value
+           uniqueItems: true
+                  
+                      
+        transport_mode:
+          type: string
+          enum: [ Ocean ]    
+          default: Ocean          
+        ocean_carrier:
+          $ref: '#/components/schemas/Carrier'   
+        parties:
+          type: array
+          items:
+            $ref: '#/components/schemas/PartyWithRole'         
+
+        load_type:
+          $ref: '#/components/schemas/OceanLoadType'
+        stops:
+          type: array
+          description: List of stops associated with the Transport. Stops are ordered with its sequence number.
+          items:
+           $ref: '#/components/schemas/OceanTransportStopWithTimeSlot'
+        equipment_details:
+          type: object
+          $ref: '#/components/schemas/EquipmentDetails'
+        custom_fields:
+          $ref: '#/components/schemas/CustomFields' 
+        vessel:
+          description: provide details of the vessel used for transport, including at least one of the following name, IMO, or MMSI
+          $ref: '#/components/schemas/VesselDetails'
+        related_transports:
+          type: array
+          description: related transports part of the chain
+          items:
+           $ref: '#/components/schemas/RelatedTransports'
+        incoterm:
+          $ref: '#/components/schemas/Incoterm'
+        contract_references:
+          $ref: '#/components/schemas/ContractReferences'
+        
+          
+
+      oneOf:
+        - title: "Carrier Tracking"
+          description: "Requires `tracking_references`, `transport_mode`, and `ocean_carrier`"  
+          required:
+            - tracking_references
+            - transport_mode
+            - ocean_carrier
+            
+        - title: "Vessel Tracking"
+          description: "Requires `transport_mode`, `vessel`, and `stops`."
+          required:
+            - transport_mode
+            - vessel
+            - stops
+            
+    CreateAirTransport:
+      type: object
+      properties:
+        tracking_references:
+           type: array
+           description: List of tracking references for the transport
+           minItems: 1
+           maxItems: 1
+           items:
+             type: object
+             properties:
+               type:
+                 type: string
+                 description:  identifier types are accepted when creating or updating a Transport
+                 enum:
+                   - air_way_bill
+
+               value:
+                 type: string
+                 description: The value of this identifier. Required field 
+             required:
+              - type
+              - value                 
+        transport_mode:
+          type: string
+          enum: [ Air ]
+          default: Air          
+      
+        air_carrier:
+          $ref: '#/components/schemas/Carrier'   
+        parties:
+          type: array
+          items:
+            $ref: '#/components/schemas/PartyWithRole'  
+        delivery_items:
+          type: object
+          $ref: '#/components/schemas/AirDeliveryOrder'
+
+        stops:
+          type: array
+          description: List of stops associated with the Transport. Stops are ordered with its sequence number.
+          items:
+           $ref: '#/components/schemas/AirTransportStopWithTimeSlot'
+        custom_fields:
+          $ref: '#/components/schemas/CustomFields' 
+
+        related_transports:
+          type: array
+          description: related transports part of the chain
+          items:
+           $ref: '#/components/schemas/RelatedTransports'   
+
+          
+      required:
+        - air_carrier
+        - tracking_references
+        - transport_mode
+
+
+
+
+    VesselDetails:
+      type: object
+      description: Details of the vessel used for transport one of name,imo,mmsi needed
+      properties:
+        name:
+          type: string
+          description: Name of the vessel
+          example: "Ever Given"
+        imo:
+          type: string
+          description: IMO number of the vessel
+          example: "9811000"
+        mmsi:
+          type: string
+          description: MMSI number of the vessel
+          example: "636092321"
+        voyage_id:
+          type: string
+          description: Voyage ID
+          example: "VG123456"
+
+    RelatedTransports:
+      type: object
+      description: Details of the transport
+      properties:
+        transport_id:
+          type: string
+          description: The Transporeon ID of the related transport
+        sequence:
+          type: integer
+          description: The sequence number of this transport in the chain
+      required:
+        - transport_id      
+          
+          
+          
+
+    OceanEventDetails:
+      type: object
+      description: Details of an event associated with the stop
+      properties:
+        event_id:
+          type: string
+          description: Unique id for this transport event from external.          
+        type:
+          type: string
+          enum:
+            - gate_in
+            - gate_out
+            - loading
+            - departure
+            - arrival
+            - discharge
+            - pick_up
+            - delivered
+            - empty_gate_in
+            - empty_gate_out
+            
+          description: Type of the event
+          example: "GATE_IN"
+        description:
+          type: string
+          description: Description of the event
+          example: "Container gate in at port"
+        stop:
+         type: object
+         properties:
+           stop_reference_number:
+             type: number
+             description: Reference number for stop from external platform
+             example: stop-reference-1
+           location:
+             description: Location of the stop
+             oneOf:
+               - $ref: '#/components/schemas/TransportStopLocation'
+               - $ref: '#/components/schemas/Unloccode'
+         required:
+           - location         
+         
+        time:
+          type: string
+          format: date-time
+          description: Time of the event in ISO8601 format
+          example: "2025-02-18T11:24:03Z"
+        time_type:
+          type: string
+          enum:
+            - PLANNED
+            - ESTIMATED
+            - ACTUAL
+          description: Type of the time (planned, estimated, or actual)
+          example: "PLANNED"
+        source:
+          type: string
+          description: Source of the event information
+          example: "Carrier" 
+        deleted_at:
+          type: string
+          format: date-time
+          description: Timestamp of the deletion of this event in ISO8601 format. Set this field to current time to delete previously sent event
+          example: "2025-02-18T11:24:03Z"          
+      required:
+        - type
+        - stop
+        - time
+        - time_type
+        - event_id
+        
+    AirEventDetails:
+      type: object
+      description: Details of an event associated with the stop
+      properties:
+        event_id:
+          type: string
+          description: Unique id for this transport event from external.       
+        type:
+          type: string
+          enum:
+            - gate_in
+            - gate_out
+            - loading
+            - departure
+            - arrival
+            - empty_gate_in
+            - empty_gate_out
+          description: Type of the event
+          example: "GATE_IN"
+        description:
+          type: string
+          description: Description of the event
+          example: "Container gate in at port"
+        stop:
+         type: object
+         properties:
+           stop_reference_number:
+             type: number
+             description: Reference number for stop from external platform
+             example: stop-reference-1
+           location:
+             description: Location of the stop
+             oneOf:
+               - $ref: '#/components/schemas/TransportStopLocation'
+               - $ref: '#/components/schemas/Unloccode'
+               - $ref: '#/components/schemas/Iata'
+               
+         required:
+           - location
+        time:
+          type: string
+          format: date-time
+          description: Time of the event in ISO8601 format
+          example: "2025-02-18T11:24:03Z"
+        time_type:
+          type: string
+          enum:
+            - PLANNED
+            - ESTIMATED
+            - ACTUAL
+          description: Type of the time (planned, estimated, or actual)
+          example: "PLANNED"
+        source:
+          type: string
+          description: Source of the event information
+          example: "Carrier" 
+        deleted_at:
+          type: string
+          format: date-time
+          description: Timestamp of the deletion of this event in ISO8601 format. Set this field to current time to delete previously sent event
+          example: "2025-02-18T11:24:03Z"           
+      required:
+        - type
+        - location
+        - time
+        - time_type       
+        - event_id
+    EquipmentDetails:
+      type: object
+      description: Details of the equipment used for transport
+      properties:
+        container_type:
+          type: string
+          description: Type of the container
+          example: "20GP"
+        container_number:
+          type: string
+          description: Unique identifier for the container
+          example: "ABCU1234567"
+        goods_description:
+          type: string
+          description: Description of the goods inside the container
+          example: "Electronics"
+        volume:
+          $ref: '#/components/schemas/VolumeDetails'
+
+        weight:
+          $ref: '#/components/schemas/WeightDetails'
+
+      required:
+        - container_number      
+
+
+    OceanLoadType:
+      type: string
+      example: ftl
+      default: ftl
+      enum:
+
+        - lcl
+        - fcl
+
+      description: Load type of the transport.
+
+    LoadType:
+      type: string
+      example: ftl
+      default: ftl
+      enum:
+        - ltl
+        - ftl
+        - lcl
+        - fcl
+        - cep
+        - bulk
+        - cpu
+      description: Load type of the transport.
+    MainMode:
+      type: string
+      enum:
+        - road
+        - sea
+        - inland_water
+        - air
+        - rail
+        - intermodal
+      example: road
+      description: Main mode of the delivery.
+    OceanTrackingData:
+      type: object
+      description: Tracking data relevant for ocean tracking.
+      properties:
+        vessel_name:
+          type: string
+          description: The name of the vessel used for the transport
+          example: AAA Vessel1
+        vessel_imo:
+          type: string
+          description: Unique ID of the vessel
+          example: '923362'
+        voyage_id:
+          type: string
+          description: Voyage ID
+          example: IP217R
+    Stop:
+      description: A planned stop (e.g. for loading) on a transport
+      properties:
+        stop_reference_number:
+          type: number
+          description: Reference number for stop from external platform
+          example: stop-reference-1
+        sequence_number:
+          type: integer
+          description: Sequence number of stop within a Transport
+          example: 1
+          minimum: 1
+        location:
+          description: Location of the stop
+          oneOf:
+            - $ref: '#/components/schemas/Location'
+            - $ref: '#/components/schemas/PlaceReference'
+        timeslot:
+          description: Timeslot booked for loading/unloading
+          allOf:
+            - $ref: '#/components/schemas/Timeslot'
+        stop_contacts:
+          type: array
+          description: List of contacts associated with the stop.
+          items:
+            $ref: '#/components/schemas/StopContact'
+      required:
+        - stop_reference_number
+        - sequence_number
+        - location
+    StopReference:
+      description: Reference to a stop number with related action
+      properties:
+        stop_reference_number:
+          type: string
+          example: stop-reference-1
+          description: Stop reference number
+        action:
+          type: string
+          description: Descriptive delivery order number
+          enum:
+            - collection
+            - delivery
+            - waypoint
+          example: collection
+      required:
+        - stop_reference_number
+    StopContact:
+      type: object
+      description: Contact information for a stop
+      properties:
+        contact_names:
+          type: array
+          description: Full names of the contact persons
+          items:
+            type: string
+            example: John Doe
+        phone_numbers:
+          type: array
+          description: Phone numbers of the contact persons
+          items:
+            type: string
+            example: 34567890
+        email_addresses:
+          type: array
+          description: Email address of the contact person
+          items:
+            type: string
+            example: test@test.com
+        locales:
+          type: array
+          description: Language to use for communication with the contact person
+          items:
+            type: string
+            example: english
+        phone_number_extensions:
+          type: array
+          description: Phone number extension of the contact person in ISO 3166-1 alpha-2 format
+          items:
+            type: string
+            example: 123
+            
+    AirTransportStopWithTimeSlot:
+      type: object
+      properties:
+        type:
+          type: string
+          description: 
+          enum:
+          - origin
+          - airport_of_departure
+          - airport_of_arrival
+          - destination 
+          - intransit_at_origin
+          - intransit_at_destination
+          - layover
+          - gateway          
+        stop_reference_number:
+          type: number
+          description: Reference number for stop from external platform
+          example: stop-reference-1
+        sequence_number:
+          type: integer
+          description: Sequence number of stop within a Transport
+          example: 1
+          minimum: 1         
+        location:
+          description: Location of the stop
+          oneOf:
+            - $ref: '#/components/schemas/TransportStopLocation'
+            - $ref: '#/components/schemas/Iata'
+            - $ref: '#/components/schemas/Unloccode'
+            
+        timeslot:
+          description: Timeslot 
+          $ref: '#/components/schemas/ScheduleTimeslot'
+        stop_id:
+          type: string
+          description: visibility hub unique reference for the stop   
+          readOnly: true # This field will only be included when sending data to clients.          
+      required:
+        - type
+        - sequence_number
+        - location        
+    AirTransportStopWithouTimeSlot:
+      type: object
+      properties:
+        type:
+          type: string
+          description: 
+          enum:
+          - origin
+          - airport_of_departure
+          - airport_of_arrival
+          - destination 
+          - intransit_at_origin
+          - intransit_at_destination
+          - layover
+          - gateway          
+        stop_reference_number:
+          type: number
+          description: Reference number for stop from external platform
+          example: stop-reference-1
+        sequence_number:
+          type: integer
+          description: Sequence number of stop within a Transport
+          example: 1
+          minimum: 1         
+        location:
+          description: Location of the stop
+          oneOf:
+            - $ref: '#/components/schemas/TransportStopLocation'
+            - $ref: '#/components/schemas/Iata'
+            - $ref: '#/components/schemas/Unloccode'
+            
+        stop_id:
+          type: string
+          description: visibility hub unique reference for the stop   
+          readOnly: true # This field will only be included when sending data to clients.          
+      required:
+        - type
+        - sequence_number
+        - location        
+
+
+    OceanTransportStopWithTimeSlot:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Type of the location
+          enum:
+          - port_of_loading
+          - port_of_discharge
+          - origin
+          - destination
+          - intransit_at_origin
+          - intransit_at_destination
+          - empty_gate_out
+          - empty_gate_in
+          - transshipment
+        sequence_number:
+          type: integer
+          description: Sequence number of stop within a Transport
+          example: 1
+          minimum: 1
+          
+        location:
+          description: Location of the stop
+          oneOf:
+            - $ref: '#/components/schemas/TransportStopLocation'
+            - $ref: '#/components/schemas/Unloccode'
+        timeslot:
+          description: Timeslot 
+          $ref: '#/components/schemas/ScheduleTimeslot'
+
+        stop_id:
+          type: string
+          description: visibility hub unique reference for the stop  
+          readOnly: true # This field will only be included when sending data to clients.           
+      required:
+        - type
+        - sequence_number
+        - location        
+
+    OceanTransportStopWithoutTimeSlot:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Type of the location
+          enum:
+          - port_of_loading
+          - port_of_discharge
+          - origin
+          - destination
+          - intransit_at_origin
+          - intransit_at_destination
+          - empty_gate_out
+          - empty_gate_in
+          - transshipment
+        sequence_number:
+          type: integer
+          description: Sequence number of stop within a Transport
+          example: 1
+          minimum: 1
+          
+        location:
+          description: Location of the stop
+          oneOf:
+            - $ref: '#/components/schemas/TransportStopLocation'
+            - $ref: '#/components/schemas/Unloccode'
+        stop_id:
+          type: string
+          description: visibility hub unique reference for the stop  
+          readOnly: true # This field will only be included when sending data to clients.           
+      required:
+        - type
+        - sequence_number
+        - location        
+
+    ScheduleTimeslot:
+      type: object
+      description: Planned departure and arrival times for transport
+      properties:
+        planned_departure:
+          type: string
+          format: date-time
+          description: Planned departure time in ISO8601 format
+        planned_arrival:
+          type: string
+          format: date-time
+          description: Planned arrival time in ISO8601 format
+   
+
+    TransportOneOf:
+      type: object
+      oneOf:
+        - required: ['bill_of_lading']
+        - required: ['booking_number']
+        - required: ['equipment_details']        
+           
+    TransportStopLocation:
+      title: Location
+      properties:
+        location_reference_number:
+          type: string
+          description: Location reference number provided externally
+        name:
+          type: string
+          description: Name of the location
+          example: Knight GmbH
+        address:
+          $ref: '#/components/schemas/Address'
+        coordinates:
+          $ref: '#/components/schemas/GeoPosition'
+          
+      required:
+ 
+        - name
+        - address          
+    Location:
+      type: object
+      description: Delivery station location information
+      properties:
+        location_reference_number:
+          type: string
+          description: Location reference number provided externally
+          example: b30bdd06-c581-4248-a3a2-aab9f7f64fea
+        name:
+          type: string
+          description: Name of the location
+          example: Knight GmbH
+        address:
+          $ref: '#/components/schemas/Address'
+        coordinates:
+          $ref: '#/components/schemas/GeoPosition'
+      required:
+        - location_reference_number
+        - name
+        - address
+    LocationReference:
+      type: object
+      description: Location reference
+      allOf:
+        - type: object
+          properties:
+            location_id:
+              type: string
+              description: Location reference number provided externally
+              example: b30bdd06-c581-4248-a3a2-aab9f7f64fea
+          required:
+            - location_id
+        - $ref: '#/components/schemas/StopReference'
+    Unloccode:
+      type: object
+      properties:
+        location_reference_number:
+          type: string
+          description: Location reference number provided externally      
+        code:
+          type: string
+          description: The UN/LOCODE for the location
+        name:
+          type: string
+          description: The name of the location
+      required:
+        - code   
+    Iata:
+      type: object
+      properties:
+        location_reference_number:
+          type: string
+          description: Location reference number provided externally      
+        iata:
+          type: string
+          description: code used in aviation and also in logistics to identify an airport
+        name:
+          type: string
+          description: The name of the air port
+     
+      required:
+        - iata         
+    DeliveryItemBase:
+      type: object
+      description: Information about the delivery item
+      properties:
+        stop_references:
+          type: array
+          description: stop_reference_number of stops
+          items:
+            $ref: '#/components/schemas/StopReference'
+        weight:
+          $ref: '#/components/schemas/Weight'
+        purchase_order_number:
+          type: string
+          description: Purchase order number provided to the consignee
+          example: '123'
+        order_number:
+          type: string
+          description: Order number assigned to this delivery
+          example: '123'
+        consignee_contacts:
+          type: array
+          description: Contact information for the consignee
+          items:
+            $ref: '#/components/schemas/Contact'
+      required:
+        - delivery_item_type
+        - delivery_item_id_type
+        - delivery_item_id
+    DeliveryOrder:
+      description: List of transport ids associated with transport. Can be empty array
+      allOf:
+        - properties:
+            delivery_item_type:
+              type: string
+              enum:
+                - delivery_order
+              example: delivery_order
+              description: Type of delivery item object
+            loading_length:
+              $ref: '#/components/schemas/LoadingLength'
+            order_items:
+              type: array
+              description: List of order items associated with the delivery
+              items:
+                $ref: '#/components/schemas/OrderItem'
+            delivery_order_number:
+              type: string
+              description: Descriptive delivery order number
+              example: '123'
+            custom_fields:
+              $ref: '#/components/schemas/CustomFields'
+          required:
+            - delivery_order_number
+        - $ref: '#/components/schemas/DeliveryItemBase'
+        
+    AirDeliveryOrder:
+      type: object
+      description: Information about the delivery item
+      properties:
+        delivery_item_type:
+          type: string
+          enum:
+           - air_cargo
+          example: air_cargo
+          description: Type of delivery item object for air transport
+        package_count:
+          type: integer
+          description: Number of packages in the cargo
+          example: 10
+        package_weight:
+          $ref: '#/components/schemas/WeightDetails'
+        flight_number:
+          type: string
+          description: Flight number associated with the delivery
+          example: 'AB123'
+        delivery_order_number:
+          type: string
+          description: air_way_bill number
+          example: '123'
+      required:
+        - delivery_order_number 
+        - delivery_item_type            
+        
+    Container:
+      allOf:
+        - properties:
+            container_id:
+              type: string
+              description: ID of the container
+              example: '123456789'
+            delivery_item_type:
+              type: string
+              enum:
+                - container
+              example: container
+              description: Type of delivery item object
+          required:
+            - container_id
+            - delivery_item_type
+        - $ref: '#/components/schemas/DeliveryItemBase'
+        - type: object
+          properties:
+            incoterms:
+              type: object
+              properties:
+                term:
+                  type: string
+                city:
+                  type: string
+    FuelTypeRoad:
+      type: string
+      enum:
+        - dsl
+        - elc
+        - b100
+        - hvo
+        - cng
+        - lng
+        - blng
+        - bcng
+        - hyd
+      example: dsl
+      description: |
+        Fuel type for road transport:
+         * `dsl` - Diesel
+         * `elc` - BEV - Battery Electric
+         * `b100` - 1st Generation 100% biodiesel
+         * `hvo` - 2nd Generation 100% biodiesel
+         * `cng` - Compressed Natural Gas
+         * `lng` - Liquefied Natural Gas
+         * `blng` - 100% Bio LNG
+         * `bcng` - 100% Bio CNG
+         * `hyd` - Hydrogen, Fuel Cell EV
+    VehicleTypeRoad:
+      type: string
+      enum:
+        - class_car
+        - class_n1_i
+        - class_n1_ii
+        - class_n1_iii
+        - class7_5
+        - class12
+        - class20
+        - class26
+        - class40
+        - class44
+        - class50
+        - class60
+        - class_gt60
+        - class14_klbs_rigid
+        - class19_5_klbs_rigid
+        - class33_klbs_rigid
+        - class33_klbs_articulated
+        - class80_klbs_rigid
+        - class80_klbs_articulated
+        - class_klbs_articulated_glider
+        - class16_klbs
+        - class26_klbs
+        - class44_klbs
+        - class60_klbs
+        - class80_klbs
+        - class100_klbs
+        - class130_klbs
+        - class_gt130_klbs
+      example: class_car
+      description: Vehicle type for road transport.
+    EmptyTripFactor:
+      type: number
+      format: integer
+      example: 19
+      description: Empty trip factor for transport calculated by empty running / loaded distance.
+    LoadFactor:
+      type: number
+      format: double
+      example: 10.5
+      description: Load factor for transport calculated by cargo weight/max payload weight.
+    EmissionClass:
+      type: string
+      enum:
+        - eu_euro1
+        - eu_euro2
+        - eu_euro3
+        - eu_euro4
+        - eu_euro5
+        - eu_euro6
+        - eu_euro6ac
+        - eu_euro6de
+        - us_moves1999
+        - us_moves2000
+        - us_moves2002
+        - us_moves2006
+        - us_moves2009
+        - us_moves2013
+        - us_moves2016
+        - us_moves2020
+        - jp1994
+        - jp1997
+        - jp2003
+        - jp2005
+        - jp2009
+        - jp2016
+        - us_epa1994
+        - us_epa1998
+        - us_epa2004
+        - us_epa2007
+        - us_epa2010
+      example: eu_euro1
+      description: Vehicle emission class for transport.
+    DeliveryInput:
+      allOf:
+        - type: object
+          properties:
+            sequence_number:
+              type: integer
+              format: int32
+              description: Sequence number of the delivery in the transport in the expected order of deliveries
+              example: 2
+              minimum: 1
+            consignee_contacts:
+              type: array
+              description: Contact information for the consignee
+              items:
+                $ref: '#/components/schemas/Contact'
+            owner_contacts:
+              type: array
+              description: Contact information for the consignee
+              deprecated: true
+              items:
+                $ref: '#/components/schemas/Contact'
+            loading_length:
+              $ref: '#/components/schemas/LoadingLength'
+            weight:
+              $ref: '#/components/schemas/Weight'
+            order_items:
+              type: array
+              description: List of order items associated with the delivery
+              items:
+                $ref: '#/components/schemas/OrderItem'
+          required:
+            - delivery_id
+        - $ref: '#/components/schemas/DeliveryBase'
+    Weight:
+      type: object
+      description: Weight and unit. Weight provided on Delivery level overrides weight provided on Transport level
+      properties:
+        value:
+          type: number
+          format: float
+          example: 19.5
+        unit:
+          type: string
+          enum:
+            - kg
+            - uston
+            - tonne
+            - teu
+            - feu
+            - pallet
+            - g
+            - lbs
+            - kt
+            - mg
+            - oz
+            - carat
+            - gal
+          description: Unit of "value" field
+          example: uston
+      required:
+        - value
+        - unit
+    WeightDetails:
+      type: object
+      description: Weight and unit.
+      properties:
+        value:
+          type: number
+          format: float
+          example: 19.5
+        unit:
+          type: string
+          enum:
+            - kg
+            - tonne
+            - g
+          description: Unit of "value" field
+          example: uston
+      required:
+        - value
+        - unit    
+    VolumeDetails:
+      type: object
+      description: Volume and unit.
+      properties:
+        value:
+          type: number
+          format: float
+          example: 19.5
+        unit:
+          type: string
+          enum:
+            - cm3
+            - m3
+          description: Unit of "value" field
+          example: uston
+      required:
+        - value
+        - unit         
+    LoadingLength:
+      type: object
+      properties:
+        value:
+          type: number
+          format: double
+          example: 8.2
+        unit:
+          type: string
+          enum:
+            - cm
+            - dm
+            - fp
+            - ft
+            - in
+            - km
+            - m
+            - mi
+            - mim
+            - mm
+            - nam
+            - yd
+          description: Unit of "value" field
+          example: m
+      required:
+        - value
+        - unit
+    Contact:
+      description: Contact information of a person
+      properties:
+        email_address:
+          type: string
+          description: Email address for the contact
+          example: example@example.com
+        phone_number:
+          type: string
+          description: Phone number for the contact
+          example: '+190090088'
+        first_name:
+          type: string
+          description: First name of the contact
+          example: John
+        last_name:
+          type: string
+          description: Last name of the contact
+          example: Appleseed
+        full_name:
+          type: string
+          description: Full name of the contact
+          example: John Albert Appleseed
+        locale:
+          type: string
+          description: User's language and locale preference, as a ISO 639-1 code that may be combined with a ISO 3166-1 region specifier
+          example: en_GB
+        interested_in_stop_type:
+          type: string
+          enum:
+            - collection
+            - delivery
+            - other
+          description: Sets whether user wants to get notified on "delivery" or "collection" stop events
+          example: collection
+    OrderItem:
+      type: object
+      description: Order item information
+      properties:
+        order_item_name:
+          type: string
+          description: Name of the order item
+          example: Order item 1
+        purchase_order_number:
+          description: Purchase order number of the item
+          example: INV34534534
+          type: string
+        piece_count:
+          type: number
+          description: Count of pieces in item
+          example: 7
+        piece_description:
+          type: string
+          description: Description of the item piece
+          example: 10 Cases
+        piece_sku_id:
+          type: string
+          description: SKU ID of the item piece
+          example: SKU123
+        piece_unit:
+          type: string
+          description: Unit of the item piece
+          enum:
+            - pallet
+            - box
+            - each
+            - gallon
+            - liter
+            - ounces
+          example: pallet
+        package_type:
+          type: string
+          description: Type of the package
+          enum:
+            - pallet
+            - bale
+            - box
+            - case
+            - crate
+            - drum
+            - reel
+            - container
+            - other
+        weight_amount:
+          type: number
+          format: double
+          description: Weight of the item piece
+          example: 10.5,
+        weight_unit:
+          type: string
+          description: Unit of the weight of the item piece
+          enum:
+            - pounds
+            - kilograms
+            - short_tons
+            - metric_tons
+            - ounces
+            - grams
+        item_length:
+          type: number
+          format: double
+          description: Length of the item piece
+          example: 12.75
+        item_width:
+          type: number
+          format: double
+          description: Width of the item piece
+          example: 4.95
+        item_height:
+          type: number
+          format: double
+          description: Height of the item piece
+          example: 1.43
+        linear_unit:
+          type: string
+          description: Unit of the linear dimensions of the item piece
+          enum:
+            - meters
+            - kilometers
+            - inches
+            - feet
+            - miles
+        volume:
+          type: number
+          format: double
+          description: Volume of the item piece
+          example: 16.4
+        volume_unit:
+          type: string
+          description: Volume unit type of the volume of the item piece
+          enum:
+            - gallons
+            - liters
+            - ounces
+            - cubic_feet
+            - cubic_meters
+          example: liters
+        is_hazardous:
+          type: boolean
+          description: Whether the item is hazardous
+          example: true
+        hazmat_type:
+          $ref: '#/components/schemas/HazmatType'
+        is_stackable:
+          type: boolean
+          description: Whether the item is stackable
+          example: true
+        value_amount:
+          type: number
+          format: double
+          description: Value of the item piece
+          example: 100.5
+        value_currency:
+          type: string
+          description: Currency of the value of the item piece
+          example: USD
+        temperature_min:
+          type: number
+          format: double
+          description: Minimum temperature of the item piece
+          example: -12.5
+        temperature_max:
+          type: number
+          format: double
+          description: Maximum temperature of the item piece
+          example: 35.9
+        temperature_req:
+          type: number
+          format: double
+          description: Required temperature of the item piece
+          example: 15.24
+        temperature_unit:
+          type: string
+          description: Unit of the temperature of the item piece
+          example: C
+        customs_tarrif:
+          type: number
+          description: Customs tarrif code of the item piece
+          example: 2704001000
+        custom_fields:
+          $ref: '#/components/schemas/CustomFields'
+      required:
+        - order_item_name
+    HazmatType:
+      type: object
+      description: Hazmat type
+      properties:
+        category:
+          type: string
+          description: Hazmat category
+          enum:
+            - explosives
+            - gases
+            - flammable_liquids
+            - flammable_solids
+            - oxidizing_organic
+            - toxic_infectious
+            - radioactive
+            - corrosive
+            - miscellaneous
+          example: flammable_solids
+        class:
+          type: number
+          description: Hazmat class
+          example: 4
+        name:
+          type: string
+          description: Hazmat name
+          example: coal
+      required:
+        - category
+        - class
+        - name
+    AssignedCarrierIdentifierType:
+      type: string
+      description: |
+        Type of the assigned carrier identifier.
+
+        - **company_id**: Company ID
+        - **relation_identifier**: Relation identifier between transport owner and executor
+      enum:
+        - company_id
+        - relation_identifier
+    Carrier:
+      type: object
+      properties:
+        scac:
+          type: string
+          example: "Carrier scac"
+          description: SCAC code of the carrier
+        name:
+          type: string
+          example: "Carrier Name" 
+          description: Name of the carrier
+      anyOf:
+        - required: ["scac"]
+        - required: ["name"]        
+    PartyWithRole:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [customer, shipper, consignee]
+        party:
+          $ref: '#/components/schemas/Party'        
+    Party:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "PARTY12345"
+        name:
+          type: string
+          example: "Party Name"
+    Incoterm:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "FOB"
+          description: Code of the incoterm
+        name:
+          type: string
+          example: "Free On Board"     
+          description: Name of the incoterm
+    ContractReferences:
+      type: object
+      properties:
+ 
+        import_contract_reference:
+          type: string
+          description: Contract reference to be applied for demurrage & detention costs on import (POD) side
+          example: FL3997-EPC-A-003
+        export_contract_reference:
+          type: string
+          description: Contract reference to be applied for demurrage & detention costs on export (POL) side
+          example: FL3997-EPC-A-003 
+  responses:
+    401_Unauthorized:
+      description: Access token is missing or invalid (status code 401)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    403_Forbidden:
+      description: Not allowed (status code 403)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    404_NotFound:
+      description: The resource requested could not be NotFound (status code 404)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    500_ServerError:
+      description: Internal Server Error (status code 500)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    409_Conflict:
+      description: The resource requested could not be uniquely identified, there could be more than one resource matching the query
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    429_TooManyRequests:
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: number
+          description: Shows the overall number of available requests per time period
+          example: 25
+        X-RateLimit-Remaining:
+          schema:
+            type: number
+          description: Shows the remaining number of requests available
+          example: 0
+        X-RateLimit-Reset:
+          schema:
+            type: string
+          description: Date in RFC 7231 format showing when the rate limit resets
+          example: Tue, 09 Jul 2024 07:00:24 GMT
+        Retry-After:
+          schema:
+            type: number
+          description: Time in seconds to wait until the limit resets and request could be tried again
+          example: 1
+      description: The resource was requested too many times (status code 429)
+    200_Ok:
+      description: The request succeeded.
+    202_Accepted:
+      description: The data was accepted, but there is no assurances about whether it was already processed or not. Transporeon Visbility prefers if processing of this data is done in the background asynchronously and the connection is released as soon as the data is successfully transferred.
+    204_NoContent:
+      description: The request was processed successfully without any response content (status code 204)
+    400_BadRequest:
+      description: Error response indicating invalid data in request body
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    413_PayloadTooLarge:
+      description: The payload sent to a service exceeds a limit of 1MB
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

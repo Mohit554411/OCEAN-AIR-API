@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+    "useUnknownInCatchVariables": false,
+    "incremental": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "esModuleInterop": true,
+    "outDir": "build",
+    "sourceMap": true,
+    "lib": ["es2023", "dom"],
+    "isolatedModules": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/static/assets/*.ts"]
+}
