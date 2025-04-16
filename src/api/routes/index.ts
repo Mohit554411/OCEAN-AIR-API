@@ -24,4 +24,4 @@ export function setupRoutes(app: Koa): void {
 
   app.use(apiRouter.routes());
   app.use(apiRouter.allowedMethods());
-}
+}   

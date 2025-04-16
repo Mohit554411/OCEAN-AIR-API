@@ -2,6 +2,7 @@
 import { Context } from 'koa';
 import { AuthService } from '../../services/AuthService';
 import { User } from '../../entities/User';
+import { logger } from '../../utils/logger';
 
 export class AuthController {
   private authService: AuthService;
@@ -30,8 +31,14 @@ export class AuthController {
       
       ctx.body = result;
     } catch (error) {
+      logger.error('Login error:', error);
       ctx.status = 500;
-      ctx.body = { error: { message: 'Failed to login' } };
+      ctx.body = { 
+        error: { 
+          message: 'Failed to login',
+          details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        } 
+      };
     }
   };
 
@@ -56,8 +63,14 @@ export class AuthController {
       ctx.status = 201;
       ctx.body = result;
     } catch (error) {
+      logger.error('Registration error:', error);
       ctx.status = 500;
-      ctx.body = { error: { message: 'Failed to register user' } };
+      ctx.body = { 
+        error: { 
+          message: 'Failed to register user',
+          details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        } 
+      };
     }
   };
 }

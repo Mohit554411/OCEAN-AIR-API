@@ -1,15 +1,18 @@
 {
     "compilerOptions": {
-    "useUnknownInCatchVariables": false,
-    "incremental": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "esModuleInterop": true,
-    "outDir": "build",
-    "sourceMap": true,
-    "lib": ["es2023", "dom"],
-    "isolatedModules": true
-  },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/static/assets/*.ts"]
+        "useUnknownInCatchVariables": false,
+        "incremental": true,
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "esModuleInterop": true,
+        "outDir": "build",
+        "sourceMap": true,
+        "lib": ["es2023", "dom"],
+        "isolatedModules": true,
+        "module": "CommonJS",
+        "moduleResolution": "node",
+        "target": "ES2022"
+    },
+    "include": ["src/**/*.ts"],
+    "exclude": ["src/static/assets/*.ts"]
 }

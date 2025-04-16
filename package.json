@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
-  "type": "module",
   "scripts": {
     "build": "tsc",
     "clean": "rimraf dist",
@@ -12,15 +11,17 @@
     "lint": "eslint 'src/**/*.{ts,tsx}'",
     "format": "prettier --write 'src/**/*.{ts,tsx}'",
     "test": "jest",
-    "migration:generate": "ts-node ./node_modules/typeorm/cli.js migration:generate -n",
-    "migration:run": "ts-node ./node_modules/typeorm/cli.js migration:run",
-    "migration:revert": "ts-node ./node_modules/typeorm/cli.js migration:revert"
+    "check-db": "ts-node src/scripts/check-tables.ts",
+    "migration:generate": "ts-node ./node_modules/typeorm/cli.js migration:generate -d src/database/connection.ts",
+    "migration:run": "ts-node ./node_modules/typeorm/cli.js migration:run -d src/database/connection.ts",
+    "migration:revert": "ts-node ./node_modules/typeorm/cli.js migration:revert -d src/database/connection.ts"
   },
   "dependencies": {
     "@koa/cors": "^5.0.0",
     "@koa/router": "^13.1.0",
     "bcrypt": "^5.1.1",
     "dotenv": "^16.4.7",
+    "helmet": "^8.1.0",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "kafkajs": "^2.2.4",
@@ -29,6 +30,7 @@
     "koa-helmet": "^8.0.1",
     "koa-logger": "^3.2.1",
     "pg": "^8.14.1",
+    "reflect-metadata": "^0.2.2",
     "typeorm": "^0.3.22",
     "winston": "^3.17.0"
   },

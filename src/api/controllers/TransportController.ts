@@ -13,7 +13,7 @@ export class TransportController {
   getTransports = async (ctx: Context) => {
     try {
       const { transports, total } = await this.transportService.findAll(ctx.query);
-      
+
       ctx.body = {
         transports,
         page_info: {
@@ -30,9 +30,9 @@ export class TransportController {
   getTransportById = async (ctx: Context) => {
     try {
       const { identifier_type, identifier_value } = ctx.params;
-      
+
       let transport;
-      
+
       if (identifier_type === 'transport_id') {
         transport = await this.transportService.findByTransportId(identifier_value);
       } else if (identifier_type === 'transport_number') {
@@ -42,13 +42,13 @@ export class TransportController {
         ctx.body = { error: { message: 'Invalid identifier type' } };
         return;
       }
-      
+
       if (!transport) {
         ctx.status = 404;
         ctx.body = { error: { message: 'Transport not found' } };
         return;
       }
-      
+
       ctx.body = transport;
     } catch (error) {
       ctx.status = 500;
@@ -60,9 +60,9 @@ export class TransportController {
     try {
       const { identifier_type, identifier_value } = ctx.params;
       const transportData = ctx.request.body as Partial<Transport>;
-      
+
       let existingTransport;
-      
+
       if (identifier_type === 'transport_id') {
         existingTransport = await this.transportService.findByTransportId(identifier_value);
       } else if (identifier_type === 'transport_number') {
@@ -72,19 +72,27 @@ export class TransportController {
         ctx.body = { error: { message: 'Invalid identifier type' } };
         return;
       }
-      
+
       let transport;
-      const dataToUse = { ...(transportData as object) } as any;
-      dataToUse[identifier_type] = identifier_value;
-      
+      let dataToUse = { ...(transportData as object) } as any;
+
       if (existingTransport) {
+        // Merge stops if they exist in both existing and new data
+        if (dataToUse.stops && existingTransport.stops) {
+          dataToUse.stops = [...existingTransport.stops, ...dataToUse.stops];
+        }
+        dataToUse = { ...existingTransport, ...dataToUse };
         transport = await this.transportService.update(existingTransport.id, dataToUse);
       } else {
+        // Set both fields to the same value
+        dataToUse.transportId = identifier_value;
+        dataToUse.transportNumber = identifier_value;
         transport = await this.transportService.create(dataToUse);
       }
-      
+
       ctx.body = transport;
     } catch (error) {
+      console.error('Error creating or updating transport:', error);
       ctx.status = 500;
       ctx.body = { error: { message: 'Failed to create or update transport' } };
     }
@@ -93,9 +101,9 @@ export class TransportController {
   deleteTransport = async (ctx: Context) => {
     try {
       const { identifier_type, identifier_value } = ctx.params;
-      
+
       let existingTransport;
-      
+
       if (identifier_type === 'transport_id') {
         existingTransport = await this.transportService.findByTransportId(identifier_value);
       } else if (identifier_type === 'transport_number') {
@@ -105,15 +113,15 @@ export class TransportController {
         ctx.body = { error: { message: 'Invalid identifier type' } };
         return;
       }
-      
+
       if (!existingTransport) {
         ctx.status = 404;
         ctx.body = { error: { message: 'Transport not found' } };
         return;
       }
-      
+
       await this.transportService.delete(existingTransport.id);
-      
+
       ctx.status = 204;
     } catch (error) {
       ctx.status = 500;
@@ -125,15 +133,15 @@ export class TransportController {
     try {
       const { identifier_type, identifier_value } = ctx.params;
       const { license_plate_number } = ctx.request.body as { license_plate_number: string };
-      
+
       if (!license_plate_number) {
         ctx.status = 400;
         ctx.body = { error: { message: 'License plate number is required' } };
         return;
       }
-      
+
       let transportId;
-      
+
       if (identifier_type === 'transport_id') {
         transportId = identifier_value;
       } else if (identifier_type === 'transport_number') {
@@ -149,15 +157,15 @@ export class TransportController {
         ctx.body = { error: { message: 'Invalid identifier type' } };
         return;
       }
-      
+
       const result = await this.transportService.allocateVehicle(transportId, license_plate_number);
-      
+
       if (!result) {
         ctx.status = 404;
         ctx.body = { error: { message: 'Transport or Vehicle not found' } };
         return;
       }
-      
+
       ctx.body = {
         message: `Vehicle with license plate ${license_plate_number} allocated to transport ${transportId}`
       };
@@ -170,9 +178,9 @@ export class TransportController {
   deallocateVehicle = async (ctx: Context) => {
     try {
       const { identifier_type, identifier_value } = ctx.params;
-      
+
       let transportId;
-      
+
       if (identifier_type === 'transport_id') {
         transportId = identifier_value;
       } else if (identifier_type === 'transport_number') {
@@ -188,15 +196,15 @@ export class TransportController {
         ctx.body = { error: { message: 'Invalid identifier type' } };
         return;
       }
-      
+
       const result = await this.transportService.deallocateVehicle(transportId);
-      
+
       if (!result) {
         ctx.status = 404;
         ctx.body = { error: { message: 'Transport not found or no vehicle allocated' } };
         return;
       }
-      
+
       ctx.status = 204;
     } catch (error) {
       ctx.status = 500;
