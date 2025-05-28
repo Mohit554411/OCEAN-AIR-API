@@ -19,6 +19,8 @@
   "dependencies": {
     "@koa/cors": "^5.0.0",
     "@koa/router": "^13.1.0",
+    "@mohit554411/ocean-air-types": "^1.0.2",
+    "@octokit/rest": "^22.0.0",
     "bcrypt": "^5.1.1",
     "dotenv": "^16.4.7",
     "helmet": "^8.1.0",
